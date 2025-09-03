@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { format } from 'date-fns';
-import type { Conversation } from '../types.js';
+import type { Conversation, ContentPart } from '../types.js';
 import { extractMessageText } from '../utils/messageUtils.js';
 import { strictTruncateByWidth } from '../utils/strictTruncate.js';
 import { loadConfig } from '../utils/configLoader.js';
@@ -64,7 +64,8 @@ export const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conver
       return false;
     }
     if (msg.message && Array.isArray(msg.message.content)) {
-      const hasToolResult = msg.message.content.some((it: any) => it && it.type === 'tool_result');
+      const parts = msg.message.content as ContentPart[];
+      const hasToolResult = parts.some((it) => it && it.type === 'tool_result');
       if (hasToolResult) return false;
     }
     
