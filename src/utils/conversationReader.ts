@@ -34,15 +34,15 @@ export async function getPaginatedConversations(options: PaginationOptions): Pro
     for (const year of years) {
       const yearPath = join(CODEX_SESSIONS_DIR, year);
       let months: string[] = [];
-      try { months = await readdir(yearPath); } catch { continue; }
+      try { months = await readdir(yearPath); } catch { /* ignore non-dirs */ continue; }
       for (const month of months) {
         const monthPath = join(yearPath, month);
         let days: string[] = [];
-        try { days = await readdir(monthPath); } catch { continue; }
+        try { days = await readdir(monthPath); } catch { /* ignore non-dirs */ continue; }
         for (const day of days) {
           const dayPath = join(monthPath, day);
           let files: string[] = [];
-          try { files = await readdir(dayPath); } catch { continue; }
+          try { files = await readdir(dayPath); } catch { /* ignore non-dirs */ continue; }
           const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
           for (const file of jsonlFiles) {
             const filePath = join(dayPath, file);
@@ -67,14 +67,14 @@ export async function getPaginatedConversations(options: PaginationOptions): Pro
 
   while (skippedCount < options.offset && fileIndex < allFiles.length) {
     const file = allFiles[fileIndex];
-    const conv = await readConversation(file.path, file.dir);
+    const conv = await readConversation(file.path);
     if (conv) skippedCount++;
     fileIndex++;
   }
 
   while (conversations.length < options.limit && fileIndex < allFiles.length) {
     const file = allFiles[fileIndex];
-    const conv = await readConversation(file.path, file.dir);
+    const conv = await readConversation(file.path);
     if (conv) conversations.push(conv);
     fileIndex++;
   }
@@ -89,19 +89,19 @@ export async function getAllConversations(currentDirFilter?: string): Promise<Co
     for (const year of years) {
       const yearPath = join(CODEX_SESSIONS_DIR, year);
       let months: string[] = [];
-      try { months = await readdir(yearPath); } catch { continue; }
+      try { months = await readdir(yearPath); } catch { /* ignore */ continue; }
       for (const month of months) {
         const monthPath = join(yearPath, month);
         let days: string[] = [];
-        try { days = await readdir(monthPath); } catch { continue; }
+        try { days = await readdir(monthPath); } catch { /* ignore */ continue; }
         for (const day of days) {
           const dayPath = join(monthPath, day);
           let files: string[] = [];
-          try { files = await readdir(dayPath); } catch { continue; }
+          try { files = await readdir(dayPath); } catch { /* ignore */ continue; }
           const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
           for (const file of jsonlFiles) {
             const filePath = join(dayPath, file);
-            const conv = await readConversation(filePath, `${year}/${month}/${day}`);
+            const conv = await readConversation(filePath);
             if (conv) conversations.push(conv);
           }
         }
@@ -115,7 +115,7 @@ export async function getAllConversations(currentDirFilter?: string): Promise<Co
   }
 }
 
-async function readConversation(filePath: string, _projectDir: string): Promise<Conversation | null> {
+async function readConversation(filePath: string): Promise<Conversation | null> {
   try {
     const content = await readFile(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(line => line.trim());
@@ -130,7 +130,7 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
       if (meta && meta.id) sessionId = meta.id as string;
       if (meta && meta.timestamp) startTimestamp = new Date(meta.timestamp as string);
       if (meta && meta.git && meta.git.repository_url) repoUrl = meta.git.repository_url as string;
-    } catch {}
+    } catch { /* ignore malformed first line */ }
 
     const messages: Message[] = [];
     let cwdFromIntro: string | null = null;
@@ -177,7 +177,7 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
         let parsedArgs: any = undefined;
         try {
           if (typeof data.arguments === 'string') parsedArgs = JSON.parse(data.arguments);
-        } catch {}
+        } catch { /* ignore bad arguments */ }
         const name = typeof data.name === 'string' ? data.name : 'tool';
         messages.push({
           sessionId,
@@ -198,7 +198,7 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
             const out = JSON.parse(data.output);
             if (out && typeof out.output === 'string') stdout = out.output;
           }
-        } catch {}
+        } catch { /* ignore parse errors */ }
         messages.push({
           sessionId,
           timestamp: ts,
@@ -218,13 +218,13 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
     const projectName = projectNameFromRepoUrl(repoUrl);
     const startTime = startTimestamp;
     let endTime = startTime;
-    try { const s = await stat(filePath); endTime = s.mtime; } catch {}
+    try { const s = await stat(filePath); endTime = s.mtime; } catch { /* ignore */ }
 
     let gitBranch = '-';
     try {
       const meta = JSON.parse(lines[0]);
       if (meta && meta.git && typeof meta.git.branch === 'string') gitBranch = meta.git.branch || '-';
-    } catch {}
+    } catch { /* ignore */ }
 
     const projectPath = cwdFromIntro || '';
 

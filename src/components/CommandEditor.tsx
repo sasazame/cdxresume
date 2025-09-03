@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
+import { execFileSync } from 'child_process';
 
 interface CommandEditorProps {
   initialArgs: string[];
@@ -14,7 +15,8 @@ interface ClaudeOption {
   valueDescription?: string;
 }
 
-const claudeOptions: ClaudeOption[] = [
+// Fallback list, used when `codex -h` parsing fails
+const defaultOptions: ClaudeOption[] = [
   { flags: ['-h', '--help'], description: 'Display help for command', hasValue: false },
   { flags: ['-v', '--version'], description: 'Output the version number', hasValue: false },
   { flags: ['-d', '--debug'], description: 'Enable debug mode', hasValue: false },
@@ -56,17 +58,126 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
   const { stdout } = useStdout();
   const [commandLine, setCommandLine] = useState(initialArgs.join(' '));
   const [cursorPosition, setCursorPosition] = useState(commandLine.length);
+  const [options, setOptions] = useState<ClaudeOption[]>(defaultOptions);
+  const [helpLines, setHelpLines] = useState<string[]>(getSnapshotHelpLines());
+  const [descMap, setDescMap] = useState<Record<string, string>>({});
   const [suggestions, setSuggestions] = useState<ClaudeOption[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
   
   const terminalHeight = stdout?.rows || LAYOUT_CONSTANTS.DEFAULT_TERMINAL_HEIGHT;
   const totalHeight = terminalHeight - SAFETY_MARGIN;
 
+  // Load Codex CLI options dynamically from `codex -h` (fallback to defaultOptions)
+  useEffect(() => {
+    try {
+      const out = execFileSync('codex', ['-h'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+      const parsed = parseCodexHelp(out);
+      if (parsed.length > 0) {
+        setOptions(parsed);
+      }
+      const extracted = extractOptionsBlock(out);
+      if (extracted.length > 0) setHelpLines(extracted);
+      if (extracted.length > 0) setDescMap(buildDescriptionMap(extracted));
+    } catch {
+      // keep fallback options
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function parseCodexHelp(helpText: string): ClaudeOption[] {
+    const lines = helpText.split('\n');
+    const parsed: ClaudeOption[] = [];
+    for (const raw of lines) {
+      const line = raw.replace(/\r/g, '');
+      // match lines starting with short/long flags then description
+      if (!/^\s*-{1,2}[A-Za-z0-9]/.test(line)) continue;
+      const parts = line.trim().split(/\s{2,}/);
+      const flagsPart = parts[0] || '';
+      const descPart = parts.slice(1).join('  ');
+      const flagTokens = flagsPart.split(/,\s*/);
+      const flags: string[] = [];
+      let valueDescription: string | undefined;
+      for (let token of flagTokens) {
+        const valMatch = token.match(/<([^>]+)>/);
+        if (valMatch) valueDescription = `<${valMatch[1]}>`;
+        token = token.replace(/<[^>]+>/g, '').trim();
+        if (!token) continue;
+        // ignore lone dashes that might be artifacts
+        if (token === '-' || token === '--') continue;
+        flags.push(token);
+      }
+      if (flags.length === 0) continue;
+      const hasValue = Boolean(valueDescription) || /=/.test(flagsPart);
+      parsed.push({ flags, description: descPart || '', hasValue, valueDescription });
+    }
+    return parsed;
+  }
+
+  // Intentionally preserve the order from `codex -h`; do not reorder entries.
+
+  function extractOptionsBlock(helpText: string): string[] {
+    const lines = helpText.replace(/\r/g, '').split('\n');
+    const start = lines.findIndex(l => l.trim() === 'Options:' || l.startsWith('Options:'));
+    if (start === -1) return [];
+    // Take everything after the Options: header
+    const block = lines.slice(start + 1);
+    // Stop if we hit an empty line followed by another section header (heuristic)
+    const stopIdx = block.findIndex((l, i) => l.trim() === '' && i > 0);
+    const taken = stopIdx > 0 ? block.slice(0, stopIdx) : block;
+    return taken;
+  }
+
+  // Build a map from long flag (e.g., --model) to combined description lines
+  function buildDescriptionMap(lines: string[]): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!/^\s*-{1,2}[A-Za-z0-9]/.test(line)) continue;
+      const parts = line.trim().split(/\s{2,}/);
+      const flagsPart = parts[0] || '';
+      let desc = parts.slice(1).join('  ');
+      // append continuation lines (indented and not starting a new flag)
+      let j = i + 1;
+      while (j < lines.length && /^\s{2,}/.test(lines[j]) && !/^\s*-{1,2}[A-Za-z0-9]/.test(lines[j].trim())) {
+        desc += (desc ? ' ' : '') + lines[j].trim();
+        j++;
+      }
+      // pick a long flag if present
+      const tokens = flagsPart.split(/,\s*/);
+      const long = tokens.find(t => t.trim().startsWith('--')) || tokens[0];
+      const key = (long || '').replace(/<[^>]+>/g, '').trim();
+      if (key) map[key] = desc;
+    }
+    return map;
+  }
+
+  function getSnapshotHelpLines(): string[] {
+    return [
+      '  -c, --config <key=value>                        Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override',
+      '                                                  nested values. The `value` portion is parsed as JSON. If it fails to parse as JSON, the raw string is used as a literal',
+      '  -i, --image <FILE>...                           Optional image(s) to attach to the initial prompt',
+      '  -m, --model <MODEL>                             Model the agent should use',
+      '      --oss                                       Convenience flag to select the local open source model provider. Equivalent to -c model_provider=oss; verifies a local Ollama server is',
+      '                                                  running',
+      '  -p, --profile <CONFIG_PROFILE>                  Configuration profile from config.toml to specify default options',
+      '  -s, --sandbox <SANDBOX_MODE>                    Select the sandbox policy to use when executing model-generated shell commands [possible values: read-only, workspace-write,',
+      '                                                  danger-full-access]',
+      '  -a, --ask-for-approval <APPROVAL_POLICY>        Configure when the model requires human approval before executing a command [possible values: untrusted, on-failure, on-request, never]',
+      '      --full-auto                                 Convenience alias for low-friction sandboxed automatic execution (-a on-failure, --sandbox workspace-write)',
+      '      --dangerously-bypass-approvals-and-sandbox  Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY DANGEROUS. Intended solely for running in environments',
+      '                                                  that are externally sandboxed',
+      '  -C, --cd <DIR>                                  Tell the agent to use the specified directory as its working root',
+      '      --search                                    Enable web search (off by default). When enabled, the native Responses `web_search` tool is available to the model (no per‑call approval)',
+      '  -h, --help                                      Print help (see more with \"--help\")',
+      '  -V, --version                                   Print version'
+    ];
+  }
+
   useEffect(() => {
     // Update suggestions based on current input
     const currentWord = getCurrentWord();
     if (currentWord.startsWith('-')) {
-      const matching = claudeOptions.filter(opt => 
+      const matching = options.filter(opt => 
         opt.flags.some(flag => flag.toLowerCase().startsWith(currentWord.toLowerCase()))
       );
       setSuggestions(matching);
@@ -187,9 +298,16 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
   const fixedHeight = LAYOUT_CONSTANTS.FIXED_ELEMENT_HEIGHT;
   
   // Height for suggestions if shown: title (1) + items + help (1) + borders (2) + margin (1) = 5 + items
-  const suggestionsHeight = suggestions.length > 0 
-    ? LAYOUT_CONSTANTS.SUGGESTIONS_BASE_HEIGHT + Math.min(suggestions.length, LAYOUT_CONSTANTS.MAX_SUGGESTIONS_SHOWN) 
+  const suggestedCount = Math.min(suggestions.length, LAYOUT_CONSTANTS.MAX_SUGGESTIONS_SHOWN);
+  const rawSuggestionsHeight = suggestions.length > 0 
+    ? LAYOUT_CONSTANTS.SUGGESTIONS_BASE_HEIGHT + suggestedCount
     : 0;
+  // Clamp suggestions height so that options list keeps at least MIN height
+  const maxSuggestionsHeight = Math.max(
+    0,
+    (stdout?.rows || LAYOUT_CONSTANTS.DEFAULT_TERMINAL_HEIGHT) - SAFETY_MARGIN - LAYOUT_CONSTANTS.FIXED_ELEMENT_HEIGHT - LAYOUT_CONSTANTS.OPTIONS_LIST_MARGIN - LAYOUT_CONSTANTS.MIN_OPTIONS_LIST_HEIGHT
+  );
+  const suggestionsHeight = Math.min(rawSuggestionsHeight, maxSuggestionsHeight);
   
   // Calculate remaining height for options list
   const remainingHeight = totalHeight - fixedHeight - suggestionsHeight;
@@ -216,13 +334,18 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
             {suggestions.slice(0, LAYOUT_CONSTANTS.MAX_SUGGESTIONS_SHOWN).map((suggestion, index) => {
               const flagText = suggestion.flags.join(', ');
               const isSelected = index === selectedSuggestion;
+              // Prefer map description (handles multi-line wrapped help)
+              const longFlag = suggestion.flags.find(f => f.startsWith('--')) || suggestion.flags[0];
+              const mappedDesc = longFlag ? descMap[longFlag] : undefined;
+              const descToShow = (mappedDesc || suggestion.description || '').trim();
+              const hasDesc = descToShow.length > 0;
               return (
                 <Box key={flagText}>
                   <Text color={isSelected ? 'green' : 'white'}>
                     {isSelected ? '▶ ' : '  '}
                     <Text bold>{flagText}</Text>
-                    {' - '}
-                    <Text dimColor>{suggestion.description}</Text>
+                    {hasDesc ? ' - ' : ''}
+                    {hasDesc ? <Text dimColor>{descToShow}</Text> : null}
                   </Text>
                 </Box>
               );
@@ -234,31 +357,17 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
         )}
 
         <Box marginTop={1} flexDirection="column">
-          <Text bold>Available Options:</Text>
+          <Text bold>Available Options (codex -h; snapshot 2025-09-03 if unavailable):</Text>
           <Box flexDirection="column" height={optionsListHeight} overflow="hidden">
-            {claudeOptions.map(option => {
-              const flagDisplay = option.flags.join(', ') + (option.valueDescription ? ` ${option.valueDescription}` : '');
-              const paddedFlag = flagDisplay.padEnd(35);
-              return (
-                <Text key={option.flags.join(',')} dimColor>
-                  <Text>{paddedFlag}</Text>
-                  {option.description}
-                </Text>
-              );
-            })}
+            {helpLines.map((line, idx) => (
+              <Text key={`h-${idx}`}>{line}</Text>
+            ))}
           </Box>
         </Box>
 
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>
-            ⚠️  Note: This list is based on codex --help at a specific point in time.
-          </Text>
-          <Text dimColor>
-            Please refer to official docs for the latest valid options.
-          </Text>
-          <Text dimColor>
-            Options like -r, -c, -h may cause cdxresume to malfunction.
-          </Text>
+          <Text dimColor>⚠️  Options are loaded from `codex -h` when available (falls back to a minimal list).</Text>
+          <Text dimColor>Please refer to official docs for the latest valid options.</Text>
         </Box>
 
         <Box marginTop={1}>

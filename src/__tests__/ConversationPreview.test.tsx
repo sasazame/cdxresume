@@ -393,8 +393,9 @@ describe('ConversationPreview', () => {
         <ConversationPreview conversation={toolConv} />
       );
       
-      expect(lastFrame()).toContain('[Tool Output]');
-      expect(lastFrame()).toContain('Command output here');
+      // Preview hides tool outputs
+      expect(lastFrame()).not.toContain('[Tool Output]');
+      expect(lastFrame()).not.toContain('Command output here');
     });
 
     it('handles tool error messages', () => {
@@ -418,8 +419,9 @@ describe('ConversationPreview', () => {
         <ConversationPreview conversation={toolErrorConv} />
       );
       
-      expect(lastFrame()).toContain('[Tool Error]');
-      expect(lastFrame()).toContain('Error message here');
+      // Preview hides tool errors
+      expect(lastFrame()).not.toContain('[Tool Error]');
+      expect(lastFrame()).not.toContain('Error message here');
     });
 
     it('handles file list results', () => {
@@ -443,10 +445,11 @@ describe('ConversationPreview', () => {
         <ConversationPreview conversation={fileListConv} />
       );
       
-      expect(lastFrame()).toContain('[Files Found: 3]');
-      expect(lastFrame()).toContain('file1.txt');
-      expect(lastFrame()).toContain('file2.js');
-      expect(lastFrame()).toContain('file3.md');
+      // Tool result details are hidden in preview; ensure they are not shown
+      expect(lastFrame()).not.toContain('[Files Found: 3]');
+      expect(lastFrame()).not.toContain('file1.txt');
+      expect(lastFrame()).not.toContain('file2.js');
+      expect(lastFrame()).not.toContain('file3.md');
     });
 
     it('truncates long file lists', () => {
@@ -470,10 +473,9 @@ describe('ConversationPreview', () => {
         <ConversationPreview conversation={manyFilesConv} />
       );
       
-      expect(lastFrame()).toContain('[Files Found: 15]');
-      expect(lastFrame()).toContain('file0.txt');
-      // The text is truncated due to width constraints
-      expect(lastFrame()).toContain('...');
+      // Tool result details are hidden in preview
+      expect(lastFrame()).not.toContain('[Files Found: 15]');
+      expect(lastFrame()).not.toContain('file0.txt');
     });
 
     it('handles empty tool results', () => {
@@ -495,7 +497,8 @@ describe('ConversationPreview', () => {
         <ConversationPreview conversation={emptyToolConv} />
       );
       
-      expect(lastFrame()).toContain('[Tool Result: No output]');
+      // Tool results are hidden in preview
+      expect(lastFrame()).not.toContain('[Tool Result: No output]');
     });
 
     it('skips messages with invalid timestamps', () => {
