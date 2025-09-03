@@ -85,7 +85,7 @@ Examples:
 
 Configuration:
   Key bindings can be customized in: ~/.config/cdxresume/config.toml
-  See example: https://github.com/sasazame/cdxresume/blob/main/config.toml.example
+  See example: https://github.com/sasazame/cdxresume/blob/develop/config.toml.example
   
   Note: When new features are added that conflict with your custom key bindings,
   you'll need to either:
