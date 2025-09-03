@@ -16,7 +16,7 @@ cdxresume provides an interactive terminal interface to browse and manage your C
 - cdxresume uses Codex CLI's experimental resume mechanism: `codex -c experimental_resume=<path-to-jsonl>`.
   - Because it is experimental, resume behavior is not guaranteed and may break at any time.
   - After resuming, the Codex CLI chat UI typically does not restore or render full chat history; only the resumed state is loaded. This is a limitation on the Codex CLI side, not cdxresume.
-- This project was created by adapting and reworking the UI/logic from `ccresume` (a Claude Code tool). It is not a GitHub fork; it is a new repository derived from the original concept and components.
+- This project was created by adapting and reworking the UI/logic from `ccresume` (a Claude Code tool): https://github.com/sasazame/ccresume. It is not a GitHub fork; it is a new repository derived from the original concept and components.
 
 ### Key Features
 
