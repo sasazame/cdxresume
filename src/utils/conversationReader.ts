@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, basename } from 'path';
 import { homedir } from 'os';
-import type { Conversation, Message } from '../types.js';
+import type { Conversation, Message, ContentPart } from '../types.js';
 import { extractMessageText } from './messageUtils.js';
 
 const CODEX_SESSIONS_DIR = join(homedir(), '.codex', 'sessions');
@@ -135,26 +135,38 @@ async function readConversation(filePath: string): Promise<Conversation | null> 
     const messages: Message[] = [];
     let cwdFromIntro: string | null = null;
     let counter = 0;
+    // Minimal shape used to parse log lines without using `any`
+    interface RawLine {
+      type?: string;
+      role?: 'user' | 'assistant';
+      content?: unknown;
+      record_type?: string;
+      arguments?: string;
+      name?: string;
+      call_id?: string;
+      output?: string;
+    }
     for (const line of lines) {
-      let data: any;
-      try { data = JSON.parse(line); } catch { continue; }
-      if (!data) continue;
+      let parsed: unknown;
+      try { parsed = JSON.parse(line); } catch { continue; }
+      if (!parsed || typeof parsed !== 'object') continue;
+      const data = parsed as RawLine;
       if (data.record_type === 'state') continue;
 
       // Skip internal reasoning entries; they are verbose and not user-visible chat
       if (data.type === 'reasoning') continue;
 
       if (data.type === 'message' && (data.role === 'user' || data.role === 'assistant')) {
-        const items = Array.isArray(data.content) ? data.content : [];
+        const items: ContentPart[] = Array.isArray(data.content) ? (data.content as ContentPart[]) : [];
         if (data.role === 'user') {
           for (const it of items) {
-            if (it && typeof it.text === 'string') {
-              const found = extractCwdFromContentText(it.text as string);
+            if (it && 'text' in it && typeof (it as { text?: string }).text === 'string') {
+              const found = extractCwdFromContentText((it as { text?: string }).text as string);
               if (found) { cwdFromIntro = found; break; }
             }
           }
           // Hide initial environment_context messages from history
-          const isEnvContext = items.some((it: any) => typeof it.text === 'string' && it.text.includes('<environment_context>'));
+          const isEnvContext = items.some((it) => 'text' in it && typeof (it as { text?: string }).text === 'string' && ((it as { text?: string }).text as string).includes('<environment_context>'));
           if (isEnvContext) {
             counter++;
             continue;
@@ -174,7 +186,7 @@ async function readConversation(filePath: string): Promise<Conversation | null> 
       // Map Codex function calls to tool-use style entries
       if (data.type === 'function_call') {
         const ts = new Date(startTimestamp.getTime() + counter).toISOString();
-        let parsedArgs: any = undefined;
+        let parsedArgs: unknown = undefined;
         try {
           if (typeof data.arguments === 'string') parsedArgs = JSON.parse(data.arguments);
         } catch { /* ignore bad arguments */ }
@@ -183,7 +195,7 @@ async function readConversation(filePath: string): Promise<Conversation | null> 
           sessionId,
           timestamp: ts,
           type: 'assistant',
-          message: { role: 'assistant', content: [{ type: 'tool_use', name, input: parsedArgs, tool_use_id: data.call_id }] },
+          message: { role: 'assistant', content: [{ type: 'tool_use', name, input: parsedArgs, tool_use_id: data.call_id }] as ContentPart[] },
           cwd: cwdFromIntro || ''
         } as Message);
         counter++;
@@ -203,7 +215,7 @@ async function readConversation(filePath: string): Promise<Conversation | null> 
           sessionId,
           timestamp: ts,
           type: 'assistant',
-          message: { role: 'assistant', content: [{ type: 'tool_result' }] },
+          message: { role: 'assistant', content: [{ type: 'tool_result' }] as ContentPart[] },
           cwd: cwdFromIntro || '',
           toolUseResult: stdout ? { stdout } : { content: 'tool call finished' }
         } as Message);
