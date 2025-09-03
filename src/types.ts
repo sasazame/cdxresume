@@ -53,8 +53,7 @@ export type ContentPart =
   | { type: 'output_text'; text?: string }
   | { type: 'tool_use'; name?: string; input?: unknown; tool_use_id?: string }
   | { type: 'tool_result' }
-  | { type: 'thinking'; thinking?: string }
-  | { type: string; text?: string };
+  | { type: 'thinking'; thinking?: string };
 
 export interface Conversation {
   sessionId: string;

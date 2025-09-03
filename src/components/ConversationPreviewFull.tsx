@@ -56,14 +56,6 @@ interface MultiEditInput {
   }>;
 }
 
-type MessageContentItem = {
-  type: string;
-  text?: string;
-  name?: string;
-  input?: unknown;
-  tool_use_id?: string;
-  thinking?: string;
-};
 
 interface ConversationPreviewFullProps {
   conversation: Conversation | null;
@@ -165,21 +157,21 @@ export const ConversationPreviewFull: React.FC<ConversationPreviewFullProps> = (
               const contentParts: string[] = [];
               
               // Check for thinking content
-              const thinkingItem = messageContent.find((item: MessageContentItem) => item.type === 'thinking');
-              if (thinkingItem && thinkingItem.thinking) {
+              const thinkingItem = messageContent.find((item) => item.type === 'thinking') as Extract<ContentPart, { type: 'thinking' }> | undefined;
+              if (thinkingItem && typeof thinkingItem.thinking === 'string') {
                 contentParts.push(`[Thinking...]\n${thinkingItem.thinking.trim()}`);
               }
               
               // Check for regular text content
-              const textItems = messageContent.filter((item: MessageContentItem) => item.type === 'text');
-              textItems.forEach((item: MessageContentItem) => {
-                if (item.text) {
+              const textItems = messageContent.filter((item) => item.type === 'text');
+              textItems.forEach((item) => {
+                if ('text' in item && item.text) {
                   contentParts.push(item.text);
                 }
               });
               
               // Check for tool use
-              const toolUse = messageContent.find((item: MessageContentItem) => item.type === 'tool_use');
+              const toolUse = messageContent.find((item) => item.type === 'tool_use') as Extract<ContentPart, { type: 'tool_use' }> | undefined;
               if (toolUse) {
                 // Format tool use based on tool name
                 if (toolUse.name === 'TodoWrite') {
