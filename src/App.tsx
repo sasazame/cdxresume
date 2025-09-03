@@ -105,7 +105,6 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
             stdout.write('\u001b[?2004l');   // disable bracketed paste mode
             stdout.write('\u001b[2J');       // clear screen
             stdout.write('\u001b[H');        // move cursor to home
-            stdout.write('\u001bc');         // full terminal reset (ESC c)
           } catch { void 0; }
         }
 
@@ -113,6 +112,14 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
         if (process.platform !== 'win32') {
           try {
             spawnSync('stty', ['sane'], { stdio: 'ignore' });
+          } catch { /* ignore */ }
+        }
+
+        // Drain any pending keyboard input so escape sequences don't leak into Codex
+        if (process.platform !== 'win32') {
+          try {
+            // Use non-blocking read from /dev/tty to discard pending bytes
+            spawnSync('sh', ['-lc', 'dd if=/dev/tty of=/dev/null bs=1 count=100000 iflag=nonblock 2>/dev/null || true'], { stdio: 'ignore' });
           } catch { /* ignore */ }
         }
 
