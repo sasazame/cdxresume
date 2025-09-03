@@ -416,7 +416,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       </Box>
       
       <Box height={previewHeight}>
-        <ConversationPreview conversation={selectedConversation} statusMessage={statusMessage} hideOptions={hideOptions} />
+        <ConversationPreview conversation={selectedConversation} statusMessage={statusMessage} hideOptions={hideOptions} viewportHeight={previewHeight} />
       </Box>
       
       {/* Bottom margin to absorb any overflow */}

@@ -8,21 +8,21 @@ import { loadConfig } from '../utils/configLoader.js';
 import { matchesKeyBinding } from '../utils/keyBindingHelper.js';
 import { getShortcutText, hasKeyConflict } from '../utils/shortcutHelper.js';
 import type { Config } from '../types/config.js';
+import { defaultConfig } from '../types/config.js';
 
 interface ConversationPreviewProps {
   conversation: Conversation | null;
   statusMessage?: string | null;
   hideOptions?: string[];
+  // Height allocated by parent for the entire preview box (in rows)
+  viewportHeight?: number;
 }
 
-export const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation, statusMessage, hideOptions = [] }) => {
+export const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation, statusMessage, hideOptions = [], viewportHeight }) => {
   const { stdout } = useStdout();
   const [scrollOffset, setScrollOffset] = useState(0);
   const terminalWidth = stdout?.columns || 80;
-  const [config, setConfig] = useState<Config | null>(null);
-  
-  // Calculate available height for messages dynamically
-  const [maxVisibleMessages, setMaxVisibleMessages] = useState(10);
+  const [config, setConfig] = useState<Config>(defaultConfig);
   
   useEffect(() => {
     // Load config on mount
@@ -30,29 +30,15 @@ export const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conver
     setConfig(loadedConfig);
   }, []);
 
-  useEffect(() => {
-    // Adjust visible messages based on terminal height
-    const terminalHeight = stdout?.rows || 24;
-    // Reserve lines for fixed parts:
-    // - Top window: 1 (title) + 8 (conversation list with borders)
-    // - Bottom window fixed parts:
-    //   - Border top: 1
-    //   - Header: 1 (Conversation History)
-    //   - Session info: 1
-    //   - Project info: 1
-    //   - Margin: 1
-    //   - Inner border: 2
-    //   - Scroll help: 1
-    //   - Border bottom: 1
-    //   - Margin: 1
-    // Total fixed: 9 (top) + 10 (bottom fixed) = 19
-    // Add extra buffer (2 lines) for multi-line text overflow
-    const bottomMargin = 2;
-    const calculatedHeight = terminalHeight - 19 - bottomMargin;
-    // Minimum 5 lines, no maximum limit
-    const availableHeight = Math.max(5, calculatedHeight);
-    setMaxVisibleMessages(availableHeight);
-  }, [stdout?.rows]);
+  
+  // Compute visible messages based on the actual viewport height provided by parent
+  // Overhead accounting inside this component (rows consumed outside the messages list):
+  // - Outer border: 2 (top/bottom)
+  // - Header block: 5 (title, session, directory, branch, spacer)
+  // - Inner messages border: 2
+  // - Footer block: 2 (spacer + one-line help/status)
+  const OVERHEAD_ROWS = 11;
+  const maxVisibleMessages = Math.max(1, (viewportHeight ?? (stdout?.rows || 24)) - OVERHEAD_ROWS);
 
   // Filter messages based on hideOptions
   const filteredMessages = conversation ? conversation.messages.filter(msg => {
