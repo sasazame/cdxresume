@@ -81,7 +81,6 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
     } catch {
       // keep fallback options
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function parseCodexHelp(helpText: string): ClaudeOption[] {
@@ -168,7 +167,7 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
       '                                                  that are externally sandboxed',
       '  -C, --cd <DIR>                                  Tell the agent to use the specified directory as its working root',
       '      --search                                    Enable web search (off by default). When enabled, the native Responses `web_search` tool is available to the model (no per‑call approval)',
-      '  -h, --help                                      Print help (see more with \"--help\")',
+      '  -h, --help                                      Print help (see more with "--help")',
       '  -V, --version                                   Print version'
     ];
   }
