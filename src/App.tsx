@@ -5,7 +5,7 @@ import { ConversationPreview } from './components/ConversationPreview.js';
 import { ConversationPreviewFull } from './components/ConversationPreviewFull.js';
 import { CommandEditor } from './components/CommandEditor.js';
 import { getPaginatedConversations } from './utils/conversationReader.js';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import clipboardy from 'clipboardy';
 import type { Conversation } from './types.js';
 import { loadConfig } from './utils/configLoader.js';
@@ -102,9 +102,18 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
             stdout.write('\u001b[0m');       // reset attributes
             stdout.write('\u001b[?25h');     // show cursor
             stdout.write('\u001b[?1049l');   // leave alt screen buffer (if enabled)
+            stdout.write('\u001b[?2004l');   // disable bracketed paste mode
             stdout.write('\u001b[2J');       // clear screen
             stdout.write('\u001b[H');        // move cursor to home
+            stdout.write('\u001bc');         // full terminal reset (ESC c)
           } catch { void 0; }
+        }
+
+        // On POSIX, ensure TTY is in a sane mode to avoid IME/input quirks
+        if (process.platform !== 'win32') {
+          try {
+            spawnSync('stty', ['sane'], { stdio: 'ignore' });
+          } catch { /* ignore */ }
         }
 
         // Output helpful information
@@ -157,7 +166,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       proc.on('close', (code) => {
         process.exit(code || 0);
       });
-      }, 60);
+      }, 120);
     }, EXECUTE_DELAY_MS);
   };
 
