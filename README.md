@@ -67,10 +67,9 @@ npx cdxresume@latest
 # Hide specific message types
 cdxresume --hide              # Default: hides tool and thinking messages
 cdxresume --hide tool         # Hide only tool messages
-cdxresume --hide thinking     # Hide only thinking messages
 cdxresume --hide user         # Hide only user messages
 cdxresume --hide assistant    # Hide only assistant messages
-cdxresume --hide tool thinking user  # Hide multiple types
+cdxresume --hide tool user  # Hide multiple types
 
 # Filter to current directory
 cdxresume .
@@ -91,9 +90,6 @@ All unrecognized command-line arguments are passed directly to the `codex` comma
 ```bash
 # Pass options to codex
 cdxresume --some-codex-flag
-
-# Multiple options
-cdxresume --model opus
 
 # Combine cdxresume and codex options
 cdxresume --hide tool --model opus 
