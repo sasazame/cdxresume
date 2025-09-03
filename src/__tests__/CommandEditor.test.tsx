@@ -33,9 +33,9 @@ describe('CommandEditor', () => {
       />
     );
 
-    expect(lastFrame()).toContain('Available Options:');
-    expect(lastFrame()).toContain('-p, --print');
-    expect(lastFrame()).toContain('-c, --continue');
+    expect(lastFrame()).toContain('Available Options');
+    // Options are loaded from `codex -h`; assert presence of common help line
+    expect(lastFrame()).toContain('--help');
     expect(lastFrame()).toContain('Please refer to official docs');
   });
 
