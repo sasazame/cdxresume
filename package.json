@@ -62,6 +62,9 @@
     "node": ">=18"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ]
 }
