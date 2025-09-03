@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp, useStdout } from 'ink';
+import { Box, Text, useInput, useApp, useStdout, useStdin } from 'ink';
 import { ConversationList } from './components/ConversationList.js';
 import { ConversationPreview } from './components/ConversationPreview.js';
 import { ConversationPreviewFull } from './components/ConversationPreviewFull.js';
@@ -35,6 +35,7 @@ const STATUS_MESSAGE_DURATION_MS = 2000; // Duration to show status messages
 const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideOptions = [] }) => {
   const { exit } = useApp();
   const { stdout } = useStdout();
+  const { setRawMode } = useStdin();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -91,16 +92,30 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
     
     setTimeout(() => {
       exit();
-      
-      // Output helpful information
-      if (actionType === 'resume') {
-        console.log(`\nResuming conversation: ${conversation.sessionId}`);
-      } else {
-        console.log(`\nStarting new session in: ${conversation.projectPath}`);
-      }
-      console.log(`Directory: ${conversation.projectPath}`);
-      console.log(`Executing: ${commandStr}`);
-      console.log('---');
+
+      // Give Ink a moment to unmount and reset TTY before spawning Codex
+      setTimeout(() => {
+        // Ensure terminal is back to normal (raw mode off, cursor on, clear screen)
+        try { setRawMode?.(false); } catch { void 0; }
+        if (stdout && stdout.isTTY) {
+          try {
+            stdout.write('\u001b[0m');       // reset attributes
+            stdout.write('\u001b[?25h');     // show cursor
+            stdout.write('\u001b[?1049l');   // leave alt screen buffer (if enabled)
+            stdout.write('\u001b[2J');       // clear screen
+            stdout.write('\u001b[H');        // move cursor to home
+          } catch { void 0; }
+        }
+
+        // Output helpful information
+        if (actionType === 'resume') {
+          console.log(`\nResuming conversation: ${conversation.sessionId}`);
+        } else {
+          console.log(`\nStarting new session in: ${conversation.projectPath}`);
+        }
+        console.log(`Directory: ${conversation.projectPath}`);
+        console.log(`Executing: ${commandStr}`);
+        console.log('---');
       
       // Windows-specific reminder
       if (process.platform === 'win32') {
@@ -142,6 +157,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       proc.on('close', (code) => {
         process.exit(code || 0);
       });
+      }, 60);
     }, EXECUTE_DELAY_MS);
   };
 
