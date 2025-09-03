@@ -20,8 +20,8 @@ describe('CommandEditor', () => {
       />
     );
 
-    expect(lastFrame()).toContain('Edit command options for Claude');
-    expect(lastFrame()).toContain('claude --dangerously-skip-permissions');
+    expect(lastFrame()).toContain('Edit command options for Codex');
+    expect(lastFrame()).toContain('codex --dangerously-skip-permissions');
   });
 
   it('shows available options', () => {
@@ -48,7 +48,7 @@ describe('CommandEditor', () => {
       />
     );
 
-    expect(lastFrame()).toContain('Edit command options for Claude. Press Enter to confirm, Esc to cancel.');
+    expect(lastFrame()).toContain('Edit command options for Codex. Press Enter to confirm, Esc to cancel.');
     expect(lastFrame()).toContain('Shortcuts: Enter=confirm, Esc=cancel, ←/→=move cursor, Tab=autocomplete');
   });
 
@@ -65,7 +65,7 @@ describe('CommandEditor', () => {
     stdin.write('--debug');
 
     const frame = lastFrame();
-    expect(frame).toContain('Command: claude --debug');
+    expect(frame).toContain('Command: codex --debug');
   });
 
   it('calls onComplete when Enter is pressed with no suggestions', () => {
@@ -99,7 +99,7 @@ describe('CommandEditor', () => {
     // Delete last character
     stdin.write('\x7F'); // Backspace
 
-    expect(lastFrame()).toContain('claude --tes');
+    expect(lastFrame()).toContain('codex --tes');
   });
 
   it('handles initial args correctly', () => {
@@ -127,6 +127,6 @@ describe('CommandEditor', () => {
     );
 
     // The cursor should be shown with inverse text
-    expect(lastFrame()).toMatch(/claude --test/);
+    expect(lastFrame()).toMatch(/codex --test/);
   });
 });
