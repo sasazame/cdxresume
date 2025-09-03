@@ -1,6 +1,6 @@
 {
   "name": "cdxresume",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A TUI tool for browsing and resuming Codex CLI conversations",
   "type": "module",
   "bin": {

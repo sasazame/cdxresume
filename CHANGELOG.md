@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-09-03
+
+Patch release with packaging and stability improvements.
+
+### Changed
+- Package: include README/CHANGELOG/LICENSE in published tarball.
+- Preview: ensure tail lines are visible based on actual viewport height.
+- TTY: strengthen reset before launching Codex to improve IME/input stability.
+
 ## [0.1.0] - 2025-09-03
 
 Initial release of cdxresume — a TUI for browsing and resuming OpenAI Codex CLI conversations.
