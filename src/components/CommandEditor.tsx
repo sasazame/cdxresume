@@ -118,12 +118,16 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
     const lines = helpText.replace(/\r/g, '').split('\n');
     const start = lines.findIndex(l => l.trim() === 'Options:' || l.startsWith('Options:'));
     if (start === -1) return [];
-    // Take everything after the Options: header
-    const block = lines.slice(start + 1);
-    // Stop if we hit an empty line followed by another section header (heuristic)
-    const stopIdx = block.findIndex((l, i) => l.trim() === '' && i > 0);
-    const taken = stopIdx > 0 ? block.slice(0, stopIdx) : block;
-    return taken;
+    const result: string[] = [];
+    for (let i = start + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith(' ') || line.trim() === '') { // keep indented or blank lines
+        result.push(line);
+        continue;
+      }
+      break; // first non-indented line marks end
+    }
+    return result;
   }
 
   // Build a map from long flag (e.g., --model) to combined description lines
