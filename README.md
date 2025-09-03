@@ -1,6 +1,6 @@
 # cdxresume
 
-A character user interface (CUI) tool for browsing and resuming Claude Code conversations.
+A character user interface (CUI) tool for browsing and resuming OpenAI Codex CLI conversations.
 
 ![cdxresume screenshot](docs/images/demo-screenshot.png)
 
