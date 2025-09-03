@@ -201,12 +201,12 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
   return (
     <Box height={totalHeight} flexDirection="column">
       <Box flexDirection="column" borderStyle="single" borderColor="cyan" paddingX={1} paddingY={1}>
-        <Text bold color="cyan">Claude Command Editor</Text>
-        <Text dimColor>Edit command options for Claude. Press Enter to confirm, Esc to cancel.</Text>
+        <Text bold color="cyan">Codex Command Editor</Text>
+        <Text dimColor>Edit command options for Codex. Press Enter to confirm, Esc to cancel.</Text>
         
         <Box marginTop={1}>
           <Text bold>Command: </Text>
-          <Text>claude </Text>
+          <Text>codex </Text>
           {displayCommand()}
         </Box>
 
@@ -251,13 +251,13 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
 
         <Box marginTop={1} flexDirection="column">
           <Text dimColor>
-            ⚠️  Note: This list is based on claude --help at a specific point in time.
+            ⚠️  Note: This list is based on codex --help at a specific point in time.
           </Text>
           <Text dimColor>
             Please refer to official docs for the latest valid options.
           </Text>
           <Text dimColor>
-            Options like -r, -c, -h may cause ccresume to malfunction.
+            Options like -r, -c, -h may cause cdxresume to malfunction.
           </Text>
         </Box>
 

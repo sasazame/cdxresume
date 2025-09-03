@@ -1,6 +1,6 @@
 # cdxresume
 
-A character user interface (CUI) tool for browsing and resuming OpenAI Codex CLI conversations.
+A character user interface (CUI) tool for browsing and resuming OpenAI Codex CLI sessions.
 
 ![cdxresume screenshot](docs/images/demo-screenshot.png)
 
@@ -20,13 +20,13 @@ cdxresume provides an interactive terminal interface to browse and manage your C
 
 ### Key Features
 
-- 📋 Browse all Claude Code conversations across projects
+- 📋 Browse OpenAI Codex CLI sessions across projects
 - 🔍 View detailed conversation information
 - 📎 Copy session IDs to clipboard
-- 🚀 Start new Claude sessions in selected project directories
+- 🚀 Start new Codex sessions in selected project directories
 - 📁 Filter conversations to current directory with `.` argument
 - 🎭 Hide specific message types for cleaner display
-- ⚙️ Edit Claude command options interactively before starting sessions
+- ⚙️ Edit Codex command options interactively before starting sessions
 - 🔄 Toggle full conversation view to see complete message history
 
 ![cdxresume demo](docs/images/demo.gif)
@@ -84,12 +84,12 @@ cdxresume --version
 cdxresume -v
 ```
 
-#### Passing Options to Claude
+#### Passing Options to Codex
 
-All unrecognized command-line arguments are passed directly to the `claude` command when resuming a conversation.
+All unrecognized command-line arguments are passed directly to the `codex` command when resuming a conversation.
 
 ```bash
-# Pass options to claude
+# Pass options to codex
 cdxresume --some-codex-flag
 
 # Multiple options
@@ -101,23 +101,23 @@ cdxresume . --hide --some-codex-flag
 ```
 
 **⚠️ Warning**: Since unrecognized arguments are passed to codex, avoid using options that conflict with cdxresume's functionality:
-- Don't use options like `--resume` or something like that changes claude's interactive behavior
+- Don't use options like `--resume` or something that changes Codex's interactive behavior
 
 ## Requirements
 
 - **Node.js** >= 18
-- **Claude Code** - Must be installed and configured
+- **OpenAI Codex CLI** - Must be installed and configured
 - **Operating System** - Works on macOS, Linux, and Windows (both native & WSL)
 
 ## Command Editor
 
-Press `-` to open the command editor, where you can configure Claude CLI options before starting or resuming a session. The editor provides:
+Press `-` to open the command editor, where you can configure Codex CLI options before starting or resuming a session. The editor provides:
 
-- **Autocomplete suggestions** - Type `-` to see matching Claude options
-- **Official help text** - View all available Claude CLI options
+- **Autocomplete suggestions** - Type `-` to see matching Codex options
+- **Official help text** - View all available Codex CLI options
 - **Interactive editing** - Use arrow keys, Tab for autocomplete, Enter to confirm
 
-The configured options will be passed to Claude when you start a new session (`n`) or resume a conversation (`Enter`).
+The configured options will be passed to Codex when you start a new session (`n`) or resume a conversation (`Enter`).
 
 **Note**: The options list is based on Codex's help text at a specific point in time. Please refer to `codex --help` for the latest available options.
 
@@ -239,12 +239,7 @@ MIT
 
 For issues and feature requests, please use the [GitHub issue tracker](https://github.com/sasazame/cdxresume/issues).
 
-## 🐞 Known Issues
-
-Below are known issues and limitations. Contributions and suggestions are welcome!
-
-| No. | Title | Description | Issue |
-|:---:|:------|:-------------|:-----|
+## Known Issues
 ## Known Issues
 
 - Preview may occasionally miss the very last assistant text when followed by multiple trailing tool calls. Switching to Full View (key: f) shows everything. We’re investigating; scroll logic will be revisited.
@@ -252,4 +247,4 @@ Below are known issues and limitations. Contributions and suggestions are welcom
 - Windows native terminal limitations may affect input handling.
 - Resume via `experimental_resume` does not display the full chat history inside Codex CLI after launch. This is an upstream limitation/behavior of the experimental feature.
 
-Remember: This is an unofficial tool. For official Claude Code support, please refer to Anthropic's documentation.
+Remember: This is an unofficial tool. For official OpenAI Codex CLI support, please refer to OpenAI's documentation.

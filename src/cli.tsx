@@ -110,7 +110,7 @@ if (process.platform === 'win32') {
   const { spawn } = await import('child_process');
   
   console.log('');
-  console.log('📝 Notice for Windows users: If terminal doesn\'t accept input after Claude Code starts,');
+  console.log('📝 Notice for Windows users: If terminal doesn\'t accept input after OpenAI Codex CLI starts,');
   console.log('   press ENTER once to activate input.');
   console.log('   This is a temporary workaround for a known Windows environment issue.');
   console.log('   For details, see GitHub issue: https://github.com/sasazame/cdxresume/issues');
