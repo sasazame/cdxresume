@@ -240,7 +240,6 @@ MIT
 For issues and feature requests, please use the [GitHub issue tracker](https://github.com/sasazame/cdxresume/issues).
 
 ## Known Issues
-## Known Issues
 
 - Preview may occasionally miss the very last assistant text when followed by multiple trailing tool calls. Switching to Full View (key: f) shows everything. We’re investigating; scroll logic will be revisited.
 - Tool results are intentionally hidden to avoid layout breaks. Full View shows apply_patch diffs with colors; Preview shows an apply_patch summary only.
