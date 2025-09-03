@@ -109,13 +109,13 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       }
       
       // Spawn codex process
-      const claude = spawn(commandStr, {
+      const proc = spawn(commandStr, {
         stdio: 'inherit',
         cwd: conversation.projectPath || process.cwd(),
         shell: true
       });
       
-      claude.on('error', (err) => {
+      proc.on('error', (err) => {
         console.error(`\nFailed to ${actionType} ${actionType === 'resume' ? 'conversation' : 'new session'}:`, err.message);
         console.error('Make sure Codex CLI is installed and available in PATH');
         console.error(`Or the project directory might not exist: ${conversation.projectPath}`);
@@ -139,7 +139,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
         process.exit(1);
       });
       
-      claude.on('close', (code) => {
+      proc.on('close', (code) => {
         process.exit(code || 0);
       });
     }, EXECUTE_DELAY_MS);
