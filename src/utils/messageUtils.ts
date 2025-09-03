@@ -23,12 +23,12 @@ export function extractMessageText(content: string | ContentPart[] | undefined |
         parts.push(item.text);
       } else if (item.type === 'output_text' && item.text) {
         parts.push(item.text);
-      } else if (item.type === 'tool_use' && item.name) {
+      } else if (item.type === 'tool_use' && 'name' in item) {
         // Format tool use messages
         const toolName = item.name;
         let description = '';
         
-        if (item.input && typeof item.input === 'object') {
+        if ('input' in item && item.input && typeof item.input === 'object') {
           const input = item.input as Record<string, unknown>;
           const cmd = input?.command as unknown;
           if (typeof cmd === 'string') {
