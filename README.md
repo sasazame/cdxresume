@@ -10,6 +10,14 @@ A character user interface (CUI) tool for browsing and resuming Claude Code conv
 
 cdxresume provides an interactive terminal interface to browse and manage your Codex CLI session history. It reads session data from your local Codex CLI logs and displays them in an easy-to-navigate format.
 
+## Disclaimer / Important Notes
+
+- This is an unofficial tool for extending Codex CLI. It is not affiliated with or endorsed by the Codex CLI authors.
+- cdxresume uses Codex CLI's experimental resume mechanism: `codex -c experimental_resume=<path-to-jsonl>`.
+  - Because it is experimental, resume behavior is not guaranteed and may break at any time.
+  - After resuming, the Codex CLI chat UI typically does not restore or render full chat history; only the resumed state is loaded. This is a limitation on the Codex CLI side, not cdxresume.
+- This project was created by adapting and reworking the UI/logic from `ccresume` (a Claude Code tool). It is not a GitHub fork; it is a new repository derived from the original concept and components.
+
 ### Key Features
 
 - 📋 Browse all Claude Code conversations across projects
@@ -242,5 +250,6 @@ Below are known issues and limitations. Contributions and suggestions are welcom
 - Preview may occasionally miss the very last assistant text when followed by multiple trailing tool calls. Switching to Full View (key: f) shows everything. We’re investigating; scroll logic will be revisited.
 - Tool results are intentionally hidden to avoid layout breaks. Full View shows apply_patch diffs with colors; Preview shows an apply_patch summary only.
 - Windows native terminal limitations may affect input handling.
+- Resume via `experimental_resume` does not display the full chat history inside Codex CLI after launch. This is an upstream limitation/behavior of the experimental feature.
 
 Remember: This is an unofficial tool. For official Claude Code support, please refer to Anthropic's documentation.
