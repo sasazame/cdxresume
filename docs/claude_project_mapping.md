@@ -1,6 +1,8 @@
-# Claude Project Directory Mapping
+# Note: Legacy Claude Project Directory Mapping (Reference)
 
 ## Overview
+
+This document originates from the original ccresume project for Claude Code and is preserved for historical reference. cdxresume targets OpenAI Codex CLI and does not use Claude's `~/.claude/projects/` layout.
 
 Claude stores conversation files in `~/.claude/projects/` using a specific directory naming pattern that maps to actual project paths.
 
@@ -89,7 +91,7 @@ fi
 
 ## Performance Implications
 
-Understanding this mapping is crucial for performance optimization in tools like ccresume:
+Understanding this mapping was useful for ccresume. cdxresume reads OpenAI Codex CLI logs from `~/.codex/sessions/YYYY/MM/DD/*.jsonl` and does not depend on this mapping.
 
 1. **Without directory filtering**: Must read all conversation files to check their `projectPath`
 2. **With directory filtering**: Can skip entire directories at the file system level

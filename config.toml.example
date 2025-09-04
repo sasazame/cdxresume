@@ -28,10 +28,10 @@ pageNext = ["right"]
 pagePrevious = ["left"]
 
 # Session controls
-# Start a new Claude session in the selected project directory
+# Start a new Codex session in the selected project directory
 startNewSession = ["n"]
 
-# Open command editor to configure Claude CLI options
+# Open command editor to configure Codex CLI options
 openCommandEditor = ["-"]
 
 # Toggle full message view (experimental)

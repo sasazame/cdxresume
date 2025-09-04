@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, basename } from 'path';
 import { homedir } from 'os';
-import type { Conversation, Message } from '../types.js';
+import type { Conversation, Message, ContentPart } from '../types.js';
 import { extractMessageText } from './messageUtils.js';
 
 const CODEX_SESSIONS_DIR = join(homedir(), '.codex', 'sessions');
@@ -34,15 +34,15 @@ export async function getPaginatedConversations(options: PaginationOptions): Pro
     for (const year of years) {
       const yearPath = join(CODEX_SESSIONS_DIR, year);
       let months: string[] = [];
-      try { months = await readdir(yearPath); } catch { continue; }
+      try { months = await readdir(yearPath); } catch { /* ignore non-dirs */ continue; }
       for (const month of months) {
         const monthPath = join(yearPath, month);
         let days: string[] = [];
-        try { days = await readdir(monthPath); } catch { continue; }
+        try { days = await readdir(monthPath); } catch { /* ignore non-dirs */ continue; }
         for (const day of days) {
           const dayPath = join(monthPath, day);
           let files: string[] = [];
-          try { files = await readdir(dayPath); } catch { continue; }
+          try { files = await readdir(dayPath); } catch { /* ignore non-dirs */ continue; }
           const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
           for (const file of jsonlFiles) {
             const filePath = join(dayPath, file);
@@ -67,14 +67,14 @@ export async function getPaginatedConversations(options: PaginationOptions): Pro
 
   while (skippedCount < options.offset && fileIndex < allFiles.length) {
     const file = allFiles[fileIndex];
-    const conv = await readConversation(file.path, file.dir);
+    const conv = await readConversation(file.path);
     if (conv) skippedCount++;
     fileIndex++;
   }
 
   while (conversations.length < options.limit && fileIndex < allFiles.length) {
     const file = allFiles[fileIndex];
-    const conv = await readConversation(file.path, file.dir);
+    const conv = await readConversation(file.path);
     if (conv) conversations.push(conv);
     fileIndex++;
   }
@@ -89,19 +89,19 @@ export async function getAllConversations(currentDirFilter?: string): Promise<Co
     for (const year of years) {
       const yearPath = join(CODEX_SESSIONS_DIR, year);
       let months: string[] = [];
-      try { months = await readdir(yearPath); } catch { continue; }
+      try { months = await readdir(yearPath); } catch { /* ignore */ continue; }
       for (const month of months) {
         const monthPath = join(yearPath, month);
         let days: string[] = [];
-        try { days = await readdir(monthPath); } catch { continue; }
+        try { days = await readdir(monthPath); } catch { /* ignore */ continue; }
         for (const day of days) {
           const dayPath = join(monthPath, day);
           let files: string[] = [];
-          try { files = await readdir(dayPath); } catch { continue; }
+          try { files = await readdir(dayPath); } catch { /* ignore */ continue; }
           const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
           for (const file of jsonlFiles) {
             const filePath = join(dayPath, file);
-            const conv = await readConversation(filePath, `${year}/${month}/${day}`);
+            const conv = await readConversation(filePath);
             if (conv) conversations.push(conv);
           }
         }
@@ -115,7 +115,7 @@ export async function getAllConversations(currentDirFilter?: string): Promise<Co
   }
 }
 
-async function readConversation(filePath: string, _projectDir: string): Promise<Conversation | null> {
+async function readConversation(filePath: string): Promise<Conversation | null> {
   try {
     const content = await readFile(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(line => line.trim());
@@ -130,31 +130,43 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
       if (meta && meta.id) sessionId = meta.id as string;
       if (meta && meta.timestamp) startTimestamp = new Date(meta.timestamp as string);
       if (meta && meta.git && meta.git.repository_url) repoUrl = meta.git.repository_url as string;
-    } catch {}
+    } catch { /* ignore malformed first line */ }
 
     const messages: Message[] = [];
     let cwdFromIntro: string | null = null;
     let counter = 0;
+    // Minimal shape used to parse log lines without using `any`
+    interface RawLine {
+      type?: string;
+      role?: 'user' | 'assistant';
+      content?: unknown;
+      record_type?: string;
+      arguments?: string;
+      name?: string;
+      call_id?: string;
+      output?: string;
+    }
     for (const line of lines) {
-      let data: any;
-      try { data = JSON.parse(line); } catch { continue; }
-      if (!data) continue;
+      let parsed: unknown;
+      try { parsed = JSON.parse(line); } catch { continue; }
+      if (!parsed || typeof parsed !== 'object') continue;
+      const data = parsed as RawLine;
       if (data.record_type === 'state') continue;
 
       // Skip internal reasoning entries; they are verbose and not user-visible chat
       if (data.type === 'reasoning') continue;
 
       if (data.type === 'message' && (data.role === 'user' || data.role === 'assistant')) {
-        const items = Array.isArray(data.content) ? data.content : [];
+        const items: ContentPart[] = Array.isArray(data.content) ? (data.content as ContentPart[]) : [];
         if (data.role === 'user') {
           for (const it of items) {
-            if (it && typeof it.text === 'string') {
-              const found = extractCwdFromContentText(it.text as string);
+            if (it && 'text' in it && typeof (it as { text?: string }).text === 'string') {
+              const found = extractCwdFromContentText((it as { text?: string }).text as string);
               if (found) { cwdFromIntro = found; break; }
             }
           }
           // Hide initial environment_context messages from history
-          const isEnvContext = items.some((it: any) => typeof it.text === 'string' && it.text.includes('<environment_context>'));
+          const isEnvContext = items.some((it) => 'text' in it && typeof (it as { text?: string }).text === 'string' && ((it as { text?: string }).text as string).includes('<environment_context>'));
           if (isEnvContext) {
             counter++;
             continue;
@@ -174,16 +186,16 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
       // Map Codex function calls to tool-use style entries
       if (data.type === 'function_call') {
         const ts = new Date(startTimestamp.getTime() + counter).toISOString();
-        let parsedArgs: any = undefined;
+        let parsedArgs: unknown = undefined;
         try {
           if (typeof data.arguments === 'string') parsedArgs = JSON.parse(data.arguments);
-        } catch {}
+        } catch { /* ignore bad arguments */ }
         const name = typeof data.name === 'string' ? data.name : 'tool';
         messages.push({
           sessionId,
           timestamp: ts,
           type: 'assistant',
-          message: { role: 'assistant', content: [{ type: 'tool_use', name, input: parsedArgs, tool_use_id: data.call_id }] },
+          message: { role: 'assistant', content: [{ type: 'tool_use', name, input: parsedArgs, tool_use_id: data.call_id }] as ContentPart[] },
           cwd: cwdFromIntro || ''
         } as Message);
         counter++;
@@ -198,12 +210,12 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
             const out = JSON.parse(data.output);
             if (out && typeof out.output === 'string') stdout = out.output;
           }
-        } catch {}
+        } catch { /* ignore parse errors */ }
         messages.push({
           sessionId,
           timestamp: ts,
           type: 'assistant',
-          message: { role: 'assistant', content: [{ type: 'tool_result' }] },
+          message: { role: 'assistant', content: [{ type: 'tool_result' }] as ContentPart[] },
           cwd: cwdFromIntro || '',
           toolUseResult: stdout ? { stdout } : { content: 'tool call finished' }
         } as Message);
@@ -218,13 +230,13 @@ async function readConversation(filePath: string, _projectDir: string): Promise<
     const projectName = projectNameFromRepoUrl(repoUrl);
     const startTime = startTimestamp;
     let endTime = startTime;
-    try { const s = await stat(filePath); endTime = s.mtime; } catch {}
+    try { const s = await stat(filePath); endTime = s.mtime; } catch { /* ignore */ }
 
     let gitBranch = '-';
     try {
       const meta = JSON.parse(lines[0]);
       if (meta && meta.git && typeof meta.git.branch === 'string') gitBranch = meta.git.branch || '-';
-    } catch {}
+    } catch { /* ignore */ }
 
     const projectPath = cwdFromIntro || '';
 

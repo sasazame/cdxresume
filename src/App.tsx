@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp, useStdout } from 'ink';
+import { Box, Text, useInput, useApp, useStdout, useStdin } from 'ink';
 import { ConversationList } from './components/ConversationList.js';
 import { ConversationPreview } from './components/ConversationPreview.js';
 import { ConversationPreviewFull } from './components/ConversationPreviewFull.js';
 import { CommandEditor } from './components/CommandEditor.js';
 import { getPaginatedConversations } from './utils/conversationReader.js';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import clipboardy from 'clipboardy';
 import type { Conversation } from './types.js';
 import { loadConfig } from './utils/configLoader.js';
@@ -35,6 +35,7 @@ const STATUS_MESSAGE_DURATION_MS = 2000; // Duration to show status messages
 const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideOptions = [] }) => {
   const { exit } = useApp();
   const { stdout } = useStdout();
+  const { setRawMode } = useStdin();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -91,16 +92,46 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
     
     setTimeout(() => {
       exit();
-      
-      // Output helpful information
-      if (actionType === 'resume') {
-        console.log(`\nResuming conversation: ${conversation.sessionId}`);
-      } else {
-        console.log(`\nStarting new session in: ${conversation.projectPath}`);
-      }
-      console.log(`Directory: ${conversation.projectPath}`);
-      console.log(`Executing: ${commandStr}`);
-      console.log('---');
+
+      // Give Ink a moment to unmount and reset TTY before spawning Codex
+      setTimeout(() => {
+        // Ensure terminal is back to normal (raw mode off, cursor on, clear screen)
+        try { setRawMode?.(false); } catch { void 0; }
+        if (stdout && stdout.isTTY) {
+          try {
+            stdout.write('\u001b[0m');       // reset attributes
+            stdout.write('\u001b[?25h');     // show cursor
+            stdout.write('\u001b[?1049l');   // leave alt screen buffer (if enabled)
+            stdout.write('\u001b[?2004l');   // disable bracketed paste mode
+            stdout.write('\u001b[2J');       // clear screen
+            stdout.write('\u001b[H');        // move cursor to home
+          } catch { void 0; }
+        }
+
+        // On POSIX, ensure TTY is in a sane mode to avoid IME/input quirks
+        if (process.platform !== 'win32') {
+          try {
+            spawnSync('stty', ['sane'], { stdio: 'ignore' });
+          } catch { /* ignore */ }
+        }
+
+        // Drain any pending keyboard input so escape sequences don't leak into Codex
+        if (process.platform !== 'win32') {
+          try {
+            // Use non-blocking read from /dev/tty to discard pending bytes
+            spawnSync('sh', ['-lc', 'dd if=/dev/tty of=/dev/null bs=1 count=100000 iflag=nonblock 2>/dev/null || true'], { stdio: 'ignore' });
+          } catch { /* ignore */ }
+        }
+
+        // Output helpful information
+        if (actionType === 'resume') {
+          console.log(`\nResuming conversation: ${conversation.sessionId}`);
+        } else {
+          console.log(`\nStarting new session in: ${conversation.projectPath}`);
+        }
+        console.log(`Directory: ${conversation.projectPath}`);
+        console.log(`Executing: ${commandStr}`);
+        console.log('---');
       
       // Windows-specific reminder
       if (process.platform === 'win32') {
@@ -109,13 +140,13 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       }
       
       // Spawn codex process
-      const claude = spawn(commandStr, {
+      const proc = spawn(commandStr, {
         stdio: 'inherit',
         cwd: conversation.projectPath || process.cwd(),
         shell: true
       });
       
-      claude.on('error', (err) => {
+      proc.on('error', (err) => {
         console.error(`\nFailed to ${actionType} ${actionType === 'resume' ? 'conversation' : 'new session'}:`, err.message);
         console.error('Make sure Codex CLI is installed and available in PATH');
         console.error(`Or the project directory might not exist: ${conversation.projectPath}`);
@@ -139,9 +170,10 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
         process.exit(1);
       });
       
-      claude.on('close', (code) => {
+      proc.on('close', (code) => {
         process.exit(code || 0);
       });
+      }, 120);
     }, EXECUTE_DELAY_MS);
   };
 
@@ -391,7 +423,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       </Box>
       
       <Box height={previewHeight}>
-        <ConversationPreview conversation={selectedConversation} statusMessage={statusMessage} hideOptions={hideOptions} />
+        <ConversationPreview conversation={selectedConversation} statusMessage={statusMessage} hideOptions={hideOptions} viewportHeight={previewHeight} />
       </Box>
       
       {/* Bottom margin to absorb any overflow */}
