@@ -1,4 +1,6 @@
-export function extractMessageText(content: string | Array<{ type: string; text?: string; name?: string; input?: unknown; thinking?: string }> | undefined | null): string {
+import type { ContentPart } from '../types.js';
+
+export function extractMessageText(content: string | ContentPart[] | undefined | null): string {
   if (!content) {
     return '';
   }
@@ -17,25 +19,25 @@ export function extractMessageText(content: string | Array<{ type: string; text?
       if (item.type === 'text' && item.text) {
         parts.push(item.text);
       // Codex input/output text
-      } else if ((item as any).type === 'input_text' && (item as any).text) {
-        parts.push((item as any).text as string);
-      } else if ((item as any).type === 'output_text' && (item as any).text) {
-        parts.push((item as any).text as string);
-      } else if (item.type === 'tool_use' && item.name) {
+      } else if (item.type === 'input_text' && item.text) {
+        parts.push(item.text);
+      } else if (item.type === 'output_text' && item.text) {
+        parts.push(item.text);
+      } else if (item.type === 'tool_use' && 'name' in item) {
         // Format tool use messages
         const toolName = item.name;
         let description = '';
         
-        if (item.input && typeof item.input === 'object') {
+        if ('input' in item && item.input && typeof item.input === 'object') {
           const input = item.input as Record<string, unknown>;
-          const cmd = (input as any).command;
+          const cmd = input?.command as unknown;
           if (typeof cmd === 'string') {
             description = cmd;
           } else if (Array.isArray(cmd)) {
             try {
               // Special handling: apply_patch
-              if (cmd[0] === 'apply_patch' && typeof cmd[1] === 'string') {
-                const patch = cmd[1] as string;
+              if ((cmd as unknown[])[0] === 'apply_patch' && typeof (cmd as unknown[])[1] === 'string') {
+                const patch = (cmd as unknown[])[1] as string;
                 const adds = (patch.match(/\*\*\* Add File: /g) || []).length;
                 const updates = (patch.match(/\*\*\* Update File: /g) || []).length;
                 const deletes = (patch.match(/\*\*\* Delete File: /g) || []).length;

@@ -4,7 +4,7 @@ export interface Message {
   type: 'user' | 'assistant';
   message?: {
     role: 'user' | 'assistant';
-    content?: string | Array<{ type: string; text?: string; name?: string; input?: unknown; tool_use_id?: string; thinking?: string }>;
+    content?: string | ContentPart[];
   };
   cwd: string;
   toolUseResult?: {
@@ -45,6 +45,15 @@ export interface Message {
     usage?: unknown;
   };
 }
+
+// Content item parts within a message
+export type ContentPart =
+  | { type: 'text'; text?: string }
+  | { type: 'input_text'; text?: string }
+  | { type: 'output_text'; text?: string }
+  | { type: 'tool_use'; name?: string; input?: unknown; tool_use_id?: string }
+  | { type: 'tool_result' }
+  | { type: 'thinking'; thinking?: string };
 
 export interface Conversation {
   sessionId: string;
