@@ -4,7 +4,7 @@ A character user interface (CUI) tool for browsing and resuming OpenAI Codex CLI
 
 ![cdxresume screenshot](docs/images/demo-screenshot.png)
 
-**⚠️ DISCLAIMER: This is an unofficial third-party tool not affiliated with or endorsed by Anthropic. Use at your own risk.**
+**⚠️ DISCLAIMER: This is an unofficial third-party tool not affiliated with or endorsed by OpenAI. Use at your own risk.**
 
 ## Overview
 
@@ -67,10 +67,9 @@ npx cdxresume@latest
 # Hide specific message types
 cdxresume --hide              # Default: hides tool and thinking messages
 cdxresume --hide tool         # Hide only tool messages
-cdxresume --hide thinking     # Hide only thinking messages
 cdxresume --hide user         # Hide only user messages
 cdxresume --hide assistant    # Hide only assistant messages
-cdxresume --hide tool thinking user  # Hide multiple types
+cdxresume --hide tool user  # Hide multiple types
 
 # Filter to current directory
 cdxresume .
@@ -91,9 +90,6 @@ All unrecognized command-line arguments are passed directly to the `codex` comma
 ```bash
 # Pass options to codex
 cdxresume --some-codex-flag
-
-# Multiple options
-cdxresume --model opus
 
 # Combine cdxresume and codex options
 cdxresume --hide tool --model opus 
@@ -240,11 +236,7 @@ MIT
 For issues and feature requests, please use the [GitHub issue tracker](https://github.com/sasazame/cdxresume/issues).
 
 ## Known Issues
-## Known Issues
 
-- Preview may occasionally miss the very last assistant text when followed by multiple trailing tool calls. Switching to Full View (key: f) shows everything. We’re investigating; scroll logic will be revisited.
-- Tool results are intentionally hidden to avoid layout breaks. Full View shows apply_patch diffs with colors; Preview shows an apply_patch summary only.
-- Windows native terminal limitations may affect input handling.
 - Resume via `experimental_resume` does not display the full chat history inside Codex CLI after launch. This is an upstream limitation/behavior of the experimental feature.
 
 Remember: This is an unofficial tool. For official OpenAI Codex CLI support, please refer to OpenAI's documentation.
