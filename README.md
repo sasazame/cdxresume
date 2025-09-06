@@ -13,9 +13,10 @@ cdxresume provides an interactive terminal interface to browse and manage your C
 ## Disclaimer / Important Notes
 
 - This is an unofficial tool for extending Codex CLI. It is not affiliated with or endorsed by the Codex CLI authors.
-- cdxresume uses Codex CLI's experimental resume mechanism: `codex -c experimental_resume=<path-to-jsonl>`.
-  - Because it is experimental, resume behavior is not guaranteed and may break at any time.
-  - After resuming, the Codex CLI chat UI typically does not restore or render full chat history; only the resumed state is loaded. This is a limitation on the Codex CLI side, not cdxresume.
+- Official Codex CLI (rust-v0.30.0) now supports `--resume` (interactive picker) and `--continue` (latest session). cdxresume remains compatible and valuable as a session browser and launcher.
+- cdxresume resumes a specific selection by passing Codex’s experimental override: `codex -c experimental_resume=<path-to-jsonl>`.
+  - This path-based resume remains supported upstream and is the correct way to resume an exact rollout file from a third-party launcher.
+  - You can also pass `--resume` or `--continue` directly to Codex if you prefer its native picker/latest behavior; note that doing so ignores the selection made in cdxresume and lets Codex decide.
 - This project was created by adapting and reworking the UI/logic from `ccresume` (a Claude Code tool): https://github.com/sasazame/ccresume. It is not a GitHub fork; it is a new repository derived from the original concept and components.
 
 ### Key Features
@@ -96,8 +97,8 @@ cdxresume --hide tool --model opus
 cdxresume . --hide --some-codex-flag
 ```
 
-**⚠️ Warning**: Since unrecognized arguments are passed to codex, avoid using options that conflict with cdxresume's functionality:
-- Don't use options like `--resume` or something that changes Codex's interactive behavior
+Notes:
+- All unrecognized arguments are forwarded to Codex. If you pass `--resume` or `--continue`, Codex’s native picker/auto-resume takes over (cdxresume’s selection will be ignored).
 
 ## Requirements
 
@@ -237,6 +238,7 @@ For issues and feature requests, please use the [GitHub issue tracker](https://g
 
 ## Known Issues
 
-- Resume via `experimental_resume` does not display the full chat history inside Codex CLI after launch. This is an upstream limitation/behavior of the experimental feature.
+- Resume history rendering has improved in newer Codex CLI versions (rust-v0.30.0+). If you previously saw limited chat history after resume, updating Codex may resolve it.
+- Exact transcript visibility is ultimately controlled by Codex. When using `-c experimental_resume=<path>`, behavior may differ from Codex’s built-in `--resume` picker. If you prefer Codex-managed resume, pass `--resume` to use the native picker.
 
 Remember: This is an unofficial tool. For official OpenAI Codex CLI support, please refer to OpenAI's documentation.
