@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Compatibility with Codex consolidated log at `~/.codex/history.jsonl` (fallback when `~/.codex/sessions/YYYY/MM/DD/*.jsonl` is absent).
+- Detection of native Codex resume flags; prefer `--resume <sessionId>` / `--session-id <uuid>` when available; fall back to `-c experimental_resume=<path>`.
+
+### Changed
+- Graceful degradation when resume flags aren’t supported by the installed Codex build: start a new session and show a notice.
+
 ## [0.1.2] - 2025-09-03
 
 Hotfix: prevent stray characters right after resume/new.
