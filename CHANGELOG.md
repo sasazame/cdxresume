@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2025-09-12
+
+### Added
+- Support for Codex 0.32.0+ rollout JSONL (session_meta/response_item) parsing; user/assistant messages and tool calls are rendered comparable to legacy logs.
+- Detection of native Codex resume flags; prefer `--resume <sessionId>` / `--session-id <uuid>` when available; fall back to `-c experimental_resume=<path>` on older Codex builds.
+- When Codex version cannot be detected, cdxresume probes local logs to select the matching format; if inconclusive, it shows a notice and starts a new session.
+
+### Changed
+- Read only the format that matches the installed Codex version (legacy <0.32 vs new ≥0.32); no cross‑format conversion yet.
+- Safer process launching (no shell) and clearer error hints during resume/new.
 ## [0.1.2] - 2025-09-03
 
 Hotfix: prevent stray characters right after resume/new.
