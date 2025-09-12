@@ -10,14 +10,20 @@ A character user interface (CUI) tool for browsing and resuming OpenAI Codex CLI
 
 cdxresume provides an interactive terminal interface to browse and manage your Codex CLI session history. It reads session data from your local Codex CLI logs and displays them in an easy-to-navigate format.
 
+Important compatibility note (Codex 0.32.0+):
+- Codex 0.32.0 introduced a breaking change to the rollout JSONL format saved under `~/.codex/sessions/YYYY/MM/DD/*.jsonl`.
+- Logs created by Codex 0.31.x and earlier (legacy format) are not compatible with the new format (and vice versa).
+- cdxresume detects your installed Codex version and reads only the matching format:
+  - 0.32.0 or newer: reads only the new format
+  - 0.31.x or older: reads only the legacy format
+- Cross‑format conversion is not implemented at this time.
+
 ## Disclaimer / Important Notes
 
 - This is an unofficial tool for extending Codex CLI. It is not affiliated with or endorsed by the Codex CLI authors.
- - Official Codex CLI (v0.30.0) now supports `--resume` (interactive picker) and `--continue` (latest session). cdxresume remains compatible and valuable as a session browser and launcher. See release notes: https://github.com/openai/codex/releases/tag/rust-v0.30.0
-- cdxresume resumes a specific selection by passing Codex’s experimental override: `codex -c experimental_resume=<path-to-jsonl>`.
-  - This path-based resume remains supported upstream and is the correct way to resume an exact rollout file from a third-party launcher.
-  - You can also pass `--resume` or `--continue` directly to Codex if you prefer its native picker/latest behavior; note that doing so ignores the selection made in cdxresume and lets Codex decide.
-  - To use cdxresume’s selection, do not pass `--resume` or `--continue`; cdxresume will supply `-c experimental_resume=<path-to-jsonl>` to Codex for you.
+- Official Codex CLI (v0.30.0) now supports `--resume` (interactive picker) and `--continue` (latest session). cdxresume remains compatible and valuable as a session browser and launcher. See the release notes: [rust-v0.30.0](https://github.com/openai/codex/releases/tag/rust-v0.30.0).
+- cdxresume prefers native Codex resume flags when available. If your Codex build supports them, cdxresume will launch with `--resume <sessionId>` (or `--session-id <uuid>`). For older Codex builds, it falls back to `-c experimental_resume=<path-to-jsonl>`.
+- If the installed Codex build doesn’t support resuming by session or file path, cdxresume starts a new session and shows a notice.
 - This project was created by adapting and reworking the UI/logic from `ccresume` (a Claude Code tool): https://github.com/sasazame/ccresume. It is not a GitHub fork; it is a new repository derived from the original concept and components.
 
 ### Key Features
@@ -100,7 +106,7 @@ cdxresume . --hide --some-codex-flag
 
 Notes:
 - All unrecognized arguments are forwarded to Codex. If you pass `--resume` or `--continue`, Codex’s native picker/auto-resume takes over (cdxresume’s selection will be ignored).
- - To ensure cdxresume’s chosen session is resumed, avoid `--resume`/`--continue`; rely on the `-c experimental_resume=<path>` that cdxresume supplies.
+- To ensure cdxresume’s chosen session is resumed, avoid passing `--resume`/`--continue` yourself. cdxresume will prefer native `--resume`/`--session-id` automatically when supported, and only fall back to `-c experimental_resume=<path>` on older Codex builds.
 
 ## Requirements
 
@@ -240,7 +246,7 @@ For issues and feature requests, please use the [GitHub issue tracker](https://g
 
 ## Known Issues
 
- - Resume history rendering has improved in newer Codex CLI versions (v0.30.0+). If you previously saw limited chat history after resuming, updating Codex may resolve it.
- - Exact transcript visibility is ultimately controlled by Codex. When using `-c experimental_resume=<path>`, behavior may differ from Codex’s built‑in `--resume` picker. If you prefer a Codex‑managed resume flow, pass `--resume` to use the native picker.
+- Codex 0.32.0+ changes the session rollout file format. cdxresume reads only the format that matches your installed Codex version and does not convert logs between formats. Old logs may not appear when running with a newer Codex (and vice versa).
+- Exact transcript visibility is ultimately controlled by Codex. When using `-c experimental_resume=<path>`, behavior may differ from Codex’s built‑in `--resume` picker. If you prefer a Codex‑managed resume flow, pass `--resume` to use the native picker.
 
 Remember: This is an unofficial tool. For official OpenAI Codex CLI support, please refer to OpenAI's documentation.

@@ -11,6 +11,7 @@ import type { Conversation } from './types.js';
 import { loadConfig } from './utils/configLoader.js';
 import { matchesKeyBinding } from './utils/keyBindingHelper.js';
 import type { Config } from './types/config.js';
+import { detectCodexSupport } from './utils/codexSupport.js';
 
 interface AppProps {
   codexArgs?: string[];
@@ -46,6 +47,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
   const [showCommandEditor, setShowCommandEditor] = useState(false);
   const [editedArgs, setEditedArgs] = useState<string[]>(codexArgs);
   const [showFullView, setShowFullView] = useState(false);
+  const [codexSupport, setCodexSupport] = useState({ supportsResumeFlag: false, supportsContinueFlag: false, supportsSessionIdFlag: false });
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
@@ -56,6 +58,8 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
     // Load config on mount
     const loadedConfig = loadConfig();
     setConfig(loadedConfig);
+    // Detect Codex feature support once at startup
+    try { setCodexSupport(detectCodexSupport()); } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -139,11 +143,10 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
         console.log('');
       }
       
-      // Spawn codex process
-      const proc = spawn(commandStr, {
+      // Spawn codex process without shell to avoid injection/quoting issues
+      const proc = spawn('codex', args, {
         stdio: 'inherit',
-        cwd: conversation.projectPath || process.cwd(),
-        shell: true
+        cwd: conversation.projectPath || process.cwd()
       });
       
       proc.on('error', (err) => {
@@ -159,9 +162,8 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
             console.log(`\nResume target copied to clipboard: ${resumeTarget}`);
             console.log(`Project directory: ${conversation.projectPath}`);
             console.log(`You can manually run:`);
-            if (conversation.projectPath) console.log(`  cd "${conversation.projectPath}"`);
-            const argsStr = editedArgs.length > 0 ? editedArgs.join(' ') + ' ' : '';
-            console.log(`  codex ${argsStr}-c experimental_resume=${resumeTarget}`);
+            if (conversation.projectPath) console.log(`  cd ${JSON.stringify(conversation.projectPath)}`);
+            console.log(`  ${commandStr}`);
           } catch (clipErr) {
             console.error('Failed to copy to clipboard:', clipErr instanceof Error ? clipErr.message : String(clipErr));
           }
@@ -286,16 +288,33 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
     if (matchesKeyBinding(input, key, config.keybindings.confirm)) {
       const selectedConv = conversations[selectedIndex];
       if (selectedConv) {
-        // Experimental resume requires passing the JSONL file path via -c experimental_resume=
-        const resumeTarget = selectedConv.sourcePath || selectedConv.sessionId;
-        const commandArgs = [...editedArgs, `-c`, `experimental_resume=${resumeTarget}`];
+        const resumeTargetPath = selectedConv.sourcePath;
+        const sessionId = selectedConv.sessionId;
+
+        let commandArgs: string[] = [...editedArgs];
+        let status: string = '';
+        let didResume = true;
+
+        // Prefer native resume/session flags when available
+        if (codexSupport.supportsResumeFlag) {
+          commandArgs = [...commandArgs, '--resume', sessionId];
+          status = `Resuming by session: ${sessionId}`;
+        } else if (codexSupport.supportsSessionIdFlag) {
+          commandArgs = [...commandArgs, '--session-id', sessionId];
+          status = `Resuming conversation: ${sessionId}`;
+        } else if (resumeTargetPath) {
+          // Fallback: legacy experimental_resume path-based resume (for older Codex builds)
+          commandArgs = [...commandArgs, '-c', `experimental_resume=${resumeTargetPath}`];
+          status = `Resuming by log file: ${resumeTargetPath}`;
+        } else {
+          // Give up resuming; start new session and notify
+          commandArgs = [...editedArgs];
+          status = 'Resume not supported by this Codex build; starting a new session';
+          didResume = false;
+        }
+
         const commandStr = `codex ${commandArgs.join(' ')}`;
-        executeCodexCommand(
-          selectedConv, 
-          commandArgs, 
-          `Executing: ${commandStr}`,
-          'resume'
-        );
+        executeCodexCommand(selectedConv, commandArgs, `Executing: ${commandStr}\n${status}`, didResume ? 'resume' : 'start');
       }
     }
 

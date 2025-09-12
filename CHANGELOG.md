@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Detection of native Codex resume flags; prefer `--resume <sessionId>` / `--session-id <uuid>` when available; fall back to `-c experimental_resume=<path>`.
+- When Codex version cannot be detected, cdxresume probes local logs to select the matching format; if inconclusive, it shows a notice and starts a new session.
+
+### Changed
+- Resume now prefers native flags (`--resume` / `--session-id`) when supported; otherwise gracefully degrades to `experimental_resume` (older builds) or starts a new session with a notice.
+
 ## [0.1.2] - 2025-09-03
 
 Hotfix: prevent stray characters right after resume/new.
