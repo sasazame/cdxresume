@@ -31,28 +31,31 @@ function projectNameFromRepoUrl(url?: string): string {
 }
 
 export async function getPaginatedConversations(options: PaginationOptions): Promise<{ conversations: Conversation[]; total: number; }> {
-  const version = getCodexVersion();
-  const useNew = isCodexNewRolloutFormat(version);
-  const all = useNew
-    ? await collectNewFormatConversations()
-    : await collectLegacyFormatConversations();
-
-  const filtered = options.currentDirFilter ? all.filter(c => c.projectPath === options.currentDirFilter) : all;
-  filtered.sort((a, b) => b.endTime.getTime() - a.endTime.getTime());
-
-  const total = filtered.length;
+  const all = await getAllConversations(options.currentDirFilter);
+  const total = all.length;
   const start = Math.min(options.offset, total);
   const end = Math.min(start + options.limit, total);
-  return { conversations: filtered.slice(start, end), total };
+  return { conversations: all.slice(start, end), total };
 }
 
 export async function getAllConversations(currentDirFilter?: string): Promise<Conversation[]> {
   try {
     const version = getCodexVersion();
     const useNew = isCodexNewRolloutFormat(version);
-    const list = useNew
-      ? await collectNewFormatConversations()
-      : await collectLegacyFormatConversations();
+    let list: Conversation[] = [];
+    if (version === null) {
+      // Unknown version: be permissive and include both formats to avoid hiding sessions.
+      const [legacy, modern] = await Promise.all([
+        collectLegacyFormatConversations(),
+        collectNewFormatConversations()
+      ]);
+      const merged = new Map<string, Conversation>();
+      for (const c of legacy) merged.set(c.sessionId, c);
+      for (const c of modern) merged.set(c.sessionId, c);
+      list = Array.from(merged.values());
+    } else {
+      list = useNew ? await collectNewFormatConversations() : await collectLegacyFormatConversations();
+    }
     const filtered = currentDirFilter ? list.filter(c => c.projectPath === currentDirFilter) : list;
     return filtered.sort((a, b) => b.endTime.getTime() - a.endTime.getTime());
   } catch (error) {
@@ -141,7 +144,10 @@ async function readConversationLegacy(filePath: string): Promise<Conversation | 
     try {
       const meta = JSON.parse(lines[0]);
       if (meta && meta.id) sessionId = meta.id as string;
-      if (meta && meta.timestamp) startTimestamp = new Date(meta.timestamp as string);
+      if (meta && meta.timestamp) {
+        const ts = new Date(meta.timestamp as string);
+        startTimestamp = isNaN(ts.getTime()) ? new Date() : ts;
+      }
       if (meta && meta.git && meta.git.repository_url) repoUrl = meta.git.repository_url as string;
     } catch { /* ignore malformed first line */ }
 
@@ -170,16 +176,25 @@ async function readConversationLegacy(filePath: string): Promise<Conversation | 
       if (data.type === 'reasoning') continue;
 
       if (data.type === 'message' && (data.role === 'user' || data.role === 'assistant')) {
-        const items: ContentPart[] = Array.isArray(data.content) ? (data.content as ContentPart[]) : [];
+        let content: string | ContentPart[] | undefined;
+        if (Array.isArray(data.content)) content = data.content as ContentPart[];
+        else if (typeof data.content === 'string') content = data.content;
         if (data.role === 'user') {
-          for (const it of items) {
-            if (it && 'text' in it && typeof (it as { text?: string }).text === 'string') {
-              const found = extractCwdFromContentText((it as { text?: string }).text as string);
-              if (found) { cwdFromIntro = found; break; }
+          const texts: string[] = [];
+          if (typeof content === 'string') texts.push(content);
+          else if (Array.isArray(content)) {
+            for (const it of content) {
+              if (it && 'text' in it && typeof (it as { text?: string }).text === 'string') {
+                texts.push((it as { text?: string }).text as string);
+              }
             }
           }
+          for (const t of texts) {
+            const found = extractCwdFromContentText(t);
+            if (found) { cwdFromIntro = found; break; }
+          }
           // Hide initial environment_context messages from history
-          const isEnvContext = items.some((it) => 'text' in it && typeof (it as { text?: string }).text === 'string' && ((it as { text?: string }).text as string).includes('<environment_context>'));
+          const isEnvContext = texts.some((t) => t.includes('<environment_context>'));
           if (isEnvContext) {
             counter++;
             continue;
@@ -190,7 +205,7 @@ async function readConversationLegacy(filePath: string): Promise<Conversation | 
           sessionId,
           timestamp: ts,
           type: data.role,
-          message: { role: data.role, content: items },
+          message: { role: data.role, content },
           cwd: cwdFromIntro || ''
         } as Message);
         counter++;
@@ -218,12 +233,14 @@ async function readConversationLegacy(filePath: string): Promise<Conversation | 
       if (data.type === 'function_call_output') {
         const ts = new Date(startTimestamp.getTime() + counter).toISOString();
         let stdout: string | undefined;
-        try {
-          if (typeof data.output === 'string') {
+        if (typeof data.output === 'string') {
+          try {
             const out = JSON.parse(data.output);
-            if (out && typeof out.output === 'string') stdout = out.output;
+            stdout = (out && typeof out.output === 'string') ? out.output : data.output;
+          } catch {
+            stdout = data.output;
           }
-        } catch { /* ignore parse errors */ }
+        }
         messages.push({
           sessionId,
           timestamp: ts,
@@ -292,8 +309,11 @@ async function readConversationNew(filePath: string): Promise<Conversation | nul
       const first = JSON.parse(lines[0]) as NewLineBase;
       if (first && first.type === 'session_meta' && first.payload && typeof first.payload === 'object') {
         const p = first.payload as SessionMetaPayload;
-        sessionId = typeof p.id === 'string' ? p.id : '';
-        if (typeof p.timestamp === 'string') startTimestamp = new Date(p.timestamp);
+        sessionId = (typeof p.id === 'string' && p.id) ? p.id : basename(filePath).replace('.jsonl', '');
+        if (typeof p.timestamp === 'string') {
+          const ts = new Date(p.timestamp);
+          startTimestamp = isNaN(ts.getTime()) ? new Date() : ts;
+        }
         cwd = typeof p.cwd === 'string' ? p.cwd : '';
         if (p.git) {
           if (typeof p.git.repository_url === 'string') repoUrl = p.git.repository_url;

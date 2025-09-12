@@ -8,11 +8,11 @@ export interface CodexSupport {
 
 let cached: CodexSupport | null = null;
 
-export function detectCodexSupport(): CodexSupport {
+export function detectCodexSupport(helpOverride?: string): CodexSupport {
   if (cached) return cached;
-  let help = '';
+  let help = helpOverride ?? '';
   try {
-    help = execSync('codex --help', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+    if (!help) help = execSync('codex --help', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 2000 });
   } catch {
     // If codex is not available or help fails, assume no flags
     cached = { supportsResumeFlag: false, supportsContinueFlag: false, supportsSessionIdFlag: false };
@@ -20,11 +20,10 @@ export function detectCodexSupport(): CodexSupport {
   }
 
   const normalized = help.toLowerCase();
-  const supportsResumeFlag = /\b--resume\b/.test(normalized) || /\b-\s*r,\s*--resume\b/.test(normalized);
-  const supportsContinueFlag = /\b--continue\b/.test(normalized) || /\b-\s*c,\s*--continue\b/.test(normalized);
+  const supportsResumeFlag = /\b--resume\b/.test(normalized) || /(^|\n)\s*-\s*r(?:\b|,)/.test(normalized);
+  const supportsContinueFlag = /\b--continue\b/.test(normalized) || /(^|\n)\s*-\s*c(?:\b|,)/.test(normalized);
   const supportsSessionIdFlag = /\b--session-id\b/.test(normalized);
 
   cached = { supportsResumeFlag, supportsContinueFlag, supportsSessionIdFlag };
   return cached;
 }
-

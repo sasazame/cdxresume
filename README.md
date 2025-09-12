@@ -21,9 +21,9 @@ Important compatibility note (Codex 0.32.0+):
 ## Disclaimer / Important Notes
 
 - This is an unofficial tool for extending Codex CLI. It is not affiliated with or endorsed by the Codex CLI authors.
- - Official Codex CLI (v0.30.0) now supports `--resume` (interactive picker) and `--continue` (latest session). cdxresume remains compatible and valuable as a session browser and launcher. See release notes: https://github.com/openai/codex/releases/tag/rust-v0.30.0
-- cdxresume prefers native Codex resume flags when available. If your Codex build supports them, cdxresume will launch with `--resume <sessionId>` (or `--session-id <uuid>`). For older Codex builds, it may fall back to `-c experimental_resume=<path-to-jsonl>`.
-- If the installed Codex build doesn’t support resuming by session or file path, cdxresume will start a new session and show a notice.
+- Official Codex CLI (v0.30.0) now supports `--resume` (interactive picker) and `--continue` (latest session). cdxresume remains compatible and valuable as a session browser and launcher. See the release notes: [rust-v0.30.0](https://github.com/openai/codex/releases/tag/rust-v0.30.0).
+- cdxresume prefers native Codex resume flags when available. If your Codex build supports them, cdxresume will launch with `--resume <sessionId>` (or `--session-id <uuid>`). For older Codex builds, it falls back to `-c experimental_resume=<path-to-jsonl>`.
+- If the installed Codex build doesn’t support resuming by session or file path, cdxresume starts a new session and shows a notice.
 - This project was created by adapting and reworking the UI/logic from `ccresume` (a Claude Code tool): https://github.com/sasazame/ccresume. It is not a GitHub fork; it is a new repository derived from the original concept and components.
 
 ### Key Features
@@ -106,7 +106,7 @@ cdxresume . --hide --some-codex-flag
 
 Notes:
 - All unrecognized arguments are forwarded to Codex. If you pass `--resume` or `--continue`, Codex’s native picker/auto-resume takes over (cdxresume’s selection will be ignored).
- - To ensure cdxresume’s chosen session is resumed, avoid `--resume`/`--continue`; rely on the `-c experimental_resume=<path>` that cdxresume supplies.
+- To ensure cdxresume’s chosen session is resumed, avoid passing `--resume`/`--continue` yourself. cdxresume will prefer native `--resume`/`--session-id` automatically when supported, and only fall back to `-c experimental_resume=<path>` on older Codex builds.
 
 ## Requirements
 
