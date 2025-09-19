@@ -11,7 +11,7 @@ import type { Conversation } from './types.js';
 import { loadConfig } from './utils/configLoader.js';
 import { matchesKeyBinding } from './utils/keyBindingHelper.js';
 import type { Config } from './types/config.js';
-import { detectCodexSupport } from './utils/codexSupport.js';
+import { detectCodexSupport, type CodexSupport } from './utils/codexSupport.js';
 
 interface AppProps {
   codexArgs?: string[];
@@ -33,6 +33,26 @@ const DEFAULT_TERMINAL_HEIGHT = 24;
 const EXECUTE_DELAY_MS = 500; // Delay before executing command to show status
 const STATUS_MESSAGE_DURATION_MS = 2000; // Duration to show status messages
 
+const sanitizeResumeArgs = (args: string[]): string[] => {
+  const sanitized: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === 'resume') continue;
+    if (arg === '--resume' || arg === '-r') {
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) i += 1;
+      continue;
+    }
+    if (arg.startsWith('--resume=')) continue;
+    if (arg === '--session-id') {
+      if (i + 1 < args.length) i += 1;
+      continue;
+    }
+    if (arg.startsWith('--session-id=')) continue;
+    sanitized.push(arg);
+  }
+  return sanitized;
+};
+
 const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideOptions = [] }) => {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -47,7 +67,12 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
   const [showCommandEditor, setShowCommandEditor] = useState(false);
   const [editedArgs, setEditedArgs] = useState<string[]>(codexArgs);
   const [showFullView, setShowFullView] = useState(false);
-  const [codexSupport, setCodexSupport] = useState({ supportsResumeFlag: false, supportsContinueFlag: false, supportsSessionIdFlag: false });
+  const [codexSupport, setCodexSupport] = useState<CodexSupport>({
+    supportsResumeCommand: false,
+    supportsResumeFlag: false,
+    supportsContinueFlag: false,
+    supportsSessionIdFlag: false
+  });
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
@@ -291,20 +316,24 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
         const resumeTargetPath = selectedConv.sourcePath;
         const sessionId = selectedConv.sessionId;
 
-        let commandArgs: string[] = [...editedArgs];
+        let commandArgs: string[] = [];
         let status: string = '';
         let didResume = true;
 
         // Prefer native resume/session flags when available
-        if (codexSupport.supportsResumeFlag) {
-          commandArgs = [...commandArgs, '--resume', sessionId];
+        if (codexSupport.supportsResumeCommand) {
+          const sanitizedArgs = sanitizeResumeArgs(editedArgs);
+          commandArgs = ['resume', ...sanitizedArgs, sessionId];
+          status = `Resuming by session: ${sessionId}`;
+        } else if (codexSupport.supportsResumeFlag) {
+          commandArgs = [...editedArgs, '--resume', sessionId];
           status = `Resuming by session: ${sessionId}`;
         } else if (codexSupport.supportsSessionIdFlag) {
-          commandArgs = [...commandArgs, '--session-id', sessionId];
+          commandArgs = [...editedArgs, '--session-id', sessionId];
           status = `Resuming conversation: ${sessionId}`;
         } else if (resumeTargetPath) {
           // Fallback: legacy experimental_resume path-based resume (for older Codex builds)
-          commandArgs = [...commandArgs, '-c', `experimental_resume=${resumeTargetPath}`];
+          commandArgs = [...editedArgs, '-c', `experimental_resume=${resumeTargetPath}`];
           status = `Resuming by log file: ${resumeTargetPath}`;
         } else {
           // Give up resuming; start new session and notify
