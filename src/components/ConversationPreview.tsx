@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, startTransition } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { format } from 'date-fns';
 import type { Conversation, ContentPart } from '../types.js';
@@ -8,7 +8,6 @@ import { loadConfig } from '../utils/configLoader.js';
 import { matchesKeyBinding } from '../utils/keyBindingHelper.js';
 import { getShortcutText, hasKeyConflict } from '../utils/shortcutHelper.js';
 import type { Config } from '../types/config.js';
-import { defaultConfig } from '../types/config.js';
 
 interface ConversationPreviewProps {
   conversation: Conversation | null;
@@ -22,13 +21,7 @@ export const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conver
   const { stdout } = useStdout();
   const [scrollOffset, setScrollOffset] = useState(0);
   const terminalWidth = stdout?.columns || 80;
-  const [config, setConfig] = useState<Config>(defaultConfig);
-  
-  useEffect(() => {
-    // Load config on mount
-    const loadedConfig = loadConfig();
-    setConfig(loadedConfig);
-  }, []);
+  const config = useMemo<Config>(() => loadConfig(), []);
 
   
   // Compute visible messages based on the actual viewport height provided by parent
@@ -92,15 +85,15 @@ export const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conver
     if (conversation) {
       const totalMessages = filteredMessages.length;
       const maxOffset = Math.max(0, totalMessages - maxVisibleMessages);
-      setScrollOffset(maxOffset);
+      startTransition(() => setScrollOffset(maxOffset));
     } else {
-      setScrollOffset(0);
+      startTransition(() => setScrollOffset(0));
     }
-  }, [conversation?.sessionId, maxVisibleMessages, filteredMessages.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conversation, filteredMessages.length, maxVisibleMessages]);
 
 
   useInput((input, key) => {
-    if (!conversation || !config) return;
+    if (!conversation) return;
     
     const totalMessages = filteredMessages.length;
     const maxOffset = Math.max(0, totalMessages - maxVisibleMessages);

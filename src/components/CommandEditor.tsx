@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, startTransition } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import { execFileSync } from 'child_process';
 
@@ -54,6 +54,98 @@ const LAYOUT_CONSTANTS = {
   DEFAULT_TERMINAL_HEIGHT: 24
 } as const;
 
+function parseCodexHelp(helpText: string): ClaudeOption[] {
+  const lines = helpText.split('\n');
+  const parsed: ClaudeOption[] = [];
+  for (const raw of lines) {
+    const line = raw.replace(/\r/g, '');
+    // match lines starting with short/long flags then description
+    if (!/^\s*-{1,2}[A-Za-z0-9]/.test(line)) continue;
+    const parts = line.trim().split(/\s{2,}/);
+    const flagsPart = parts[0] || '';
+    const descPart = parts.slice(1).join('  ');
+    const flagTokens = flagsPart.split(/,\s*/);
+    const flags: string[] = [];
+    let valueDescription: string | undefined;
+    for (let token of flagTokens) {
+      const valMatch = token.match(/<([^>]+)>/);
+      if (valMatch) valueDescription = `<${valMatch[1]}>`;
+      token = token.replace(/<[^>]+>/g, '').trim();
+      if (!token) continue;
+      // ignore lone dashes that might be artifacts
+      if (token === '-' || token === '--') continue;
+      flags.push(token);
+    }
+    if (flags.length === 0) continue;
+    const hasValue = Boolean(valueDescription) || /=/.test(flagsPart);
+    parsed.push({ flags, description: descPart || '', hasValue, valueDescription });
+  }
+  return parsed;
+}
+
+// Intentionally preserve the order from `codex -h`; do not reorder entries.
+function extractOptionsBlock(helpText: string): string[] {
+  const lines = helpText.replace(/\r/g, '').split('\n');
+  const start = lines.findIndex(l => l.trim() === 'Options:' || l.startsWith('Options:'));
+  if (start === -1) return [];
+  const result: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith(' ') || line.trim() === '') { // keep indented or blank lines
+      result.push(line);
+      continue;
+    }
+    break; // first non-indented line marks end
+  }
+  return result;
+}
+
+// Build a map from long flag (e.g., --model) to combined description lines
+function buildDescriptionMap(lines: string[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/^\s*-{1,2}[A-Za-z0-9]/.test(line)) continue;
+    const parts = line.trim().split(/\s{2,}/);
+    const flagsPart = parts[0] || '';
+    let desc = parts.slice(1).join('  ');
+    // append continuation lines (indented and not starting a new flag)
+    let j = i + 1;
+    while (j < lines.length && /^\s{2,}/.test(lines[j]) && !/^\s*-{1,2}[A-Za-z0-9]/.test(lines[j].trim())) {
+      desc += (desc ? ' ' : '') + lines[j].trim();
+      j++;
+    }
+    // pick a long flag if present
+    const tokens = flagsPart.split(/,\s*/);
+    const long = tokens.find(t => t.trim().startsWith('--')) || tokens[0];
+    const key = (long || '').replace(/<[^>]+>/g, '').trim();
+    if (key) map[key] = desc;
+  }
+  return map;
+}
+
+function getSnapshotHelpLines(): string[] {
+  return [
+    '  -c, --config <key=value>                        Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override',
+    '                                                  nested values. The `value` portion is parsed as JSON. If it fails to parse as JSON, the raw string is used as a literal',
+    '  -i, --image <FILE>...                           Optional image(s) to attach to the initial prompt',
+    '  -m, --model <MODEL>                             Model the agent should use',
+    '      --oss                                       Convenience flag to select the local open source model provider. Equivalent to -c model_provider=oss; verifies a local Ollama server is',
+    '                                                  running',
+    '  -p, --profile <CONFIG_PROFILE>                  Configuration profile from config.toml to specify default options',
+    '  -s, --sandbox <SANDBOX_MODE>                    Select the sandbox policy to use when executing model-generated shell commands [possible values: read-only, workspace-write,',
+    '                                                  danger-full-access]',
+    '  -a, --ask-for-approval <APPROVAL_POLICY>        Configure when the model requires human approval before executing a command [possible values: untrusted, on-failure, on-request, never]',
+    '      --full-auto                                 Convenience alias for low-friction sandboxed automatic execution (-a on-failure, --sandbox workspace-write)',
+    '      --dangerously-bypass-approvals-and-sandbox  Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY DANGEROUS. Intended solely for running in environments',
+    '                                                  that are externally sandboxed',
+    '  -C, --cd <DIR>                                  Tell the agent to use the specified directory as its working root',
+    '      --search                                    Enable web search (off by default). When enabled, the native Responses `web_search` tool is available to the model (no per‑call approval)',
+    '  -h, --help                                      Print help (see more with "--help")',
+    '  -V, --version                                   Print version'
+  ];
+}
+
 export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onComplete, onCancel }) => {
   const { stdout } = useStdout();
   const [commandLine, setCommandLine] = useState(initialArgs.join(' '));
@@ -72,129 +164,43 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ initialArgs, onCom
     try {
       const out = execFileSync('codex', ['-h'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
       const parsed = parseCodexHelp(out);
-      if (parsed.length > 0) {
-        setOptions(parsed);
-      }
       const extracted = extractOptionsBlock(out);
-      if (extracted.length > 0) setHelpLines(extracted);
-      if (extracted.length > 0) setDescMap(buildDescriptionMap(extracted));
+      startTransition(() => {
+        if (parsed.length > 0) {
+          setOptions(parsed);
+        }
+        if (extracted.length > 0) {
+          setHelpLines(extracted);
+          setDescMap(buildDescriptionMap(extracted));
+        }
+      });
     } catch {
       // keep fallback options
     }
   }, []);
 
-  function parseCodexHelp(helpText: string): ClaudeOption[] {
-    const lines = helpText.split('\n');
-    const parsed: ClaudeOption[] = [];
-    for (const raw of lines) {
-      const line = raw.replace(/\r/g, '');
-      // match lines starting with short/long flags then description
-      if (!/^\s*-{1,2}[A-Za-z0-9]/.test(line)) continue;
-      const parts = line.trim().split(/\s{2,}/);
-      const flagsPart = parts[0] || '';
-      const descPart = parts.slice(1).join('  ');
-      const flagTokens = flagsPart.split(/,\s*/);
-      const flags: string[] = [];
-      let valueDescription: string | undefined;
-      for (let token of flagTokens) {
-        const valMatch = token.match(/<([^>]+)>/);
-        if (valMatch) valueDescription = `<${valMatch[1]}>`;
-        token = token.replace(/<[^>]+>/g, '').trim();
-        if (!token) continue;
-        // ignore lone dashes that might be artifacts
-        if (token === '-' || token === '--') continue;
-        flags.push(token);
-      }
-      if (flags.length === 0) continue;
-      const hasValue = Boolean(valueDescription) || /=/.test(flagsPart);
-      parsed.push({ flags, description: descPart || '', hasValue, valueDescription });
-    }
-    return parsed;
-  }
-
-  // Intentionally preserve the order from `codex -h`; do not reorder entries.
-
-  function extractOptionsBlock(helpText: string): string[] {
-    const lines = helpText.replace(/\r/g, '').split('\n');
-    const start = lines.findIndex(l => l.trim() === 'Options:' || l.startsWith('Options:'));
-    if (start === -1) return [];
-    const result: string[] = [];
-    for (let i = start + 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.startsWith(' ') || line.trim() === '') { // keep indented or blank lines
-        result.push(line);
-        continue;
-      }
-      break; // first non-indented line marks end
-    }
-    return result;
-  }
-
-  // Build a map from long flag (e.g., --model) to combined description lines
-  function buildDescriptionMap(lines: string[]): Record<string, string> {
-    const map: Record<string, string> = {};
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!/^\s*-{1,2}[A-Za-z0-9]/.test(line)) continue;
-      const parts = line.trim().split(/\s{2,}/);
-      const flagsPart = parts[0] || '';
-      let desc = parts.slice(1).join('  ');
-      // append continuation lines (indented and not starting a new flag)
-      let j = i + 1;
-      while (j < lines.length && /^\s{2,}/.test(lines[j]) && !/^\s*-{1,2}[A-Za-z0-9]/.test(lines[j].trim())) {
-        desc += (desc ? ' ' : '') + lines[j].trim();
-        j++;
-      }
-      // pick a long flag if present
-      const tokens = flagsPart.split(/,\s*/);
-      const long = tokens.find(t => t.trim().startsWith('--')) || tokens[0];
-      const key = (long || '').replace(/<[^>]+>/g, '').trim();
-      if (key) map[key] = desc;
-    }
-    return map;
-  }
-
-  function getSnapshotHelpLines(): string[] {
-    return [
-      '  -c, --config <key=value>                        Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`. Use a dotted path (`foo.bar.baz`) to override',
-      '                                                  nested values. The `value` portion is parsed as JSON. If it fails to parse as JSON, the raw string is used as a literal',
-      '  -i, --image <FILE>...                           Optional image(s) to attach to the initial prompt',
-      '  -m, --model <MODEL>                             Model the agent should use',
-      '      --oss                                       Convenience flag to select the local open source model provider. Equivalent to -c model_provider=oss; verifies a local Ollama server is',
-      '                                                  running',
-      '  -p, --profile <CONFIG_PROFILE>                  Configuration profile from config.toml to specify default options',
-      '  -s, --sandbox <SANDBOX_MODE>                    Select the sandbox policy to use when executing model-generated shell commands [possible values: read-only, workspace-write,',
-      '                                                  danger-full-access]',
-      '  -a, --ask-for-approval <APPROVAL_POLICY>        Configure when the model requires human approval before executing a command [possible values: untrusted, on-failure, on-request, never]',
-      '      --full-auto                                 Convenience alias for low-friction sandboxed automatic execution (-a on-failure, --sandbox workspace-write)',
-      '      --dangerously-bypass-approvals-and-sandbox  Skip all confirmation prompts and execute commands without sandboxing. EXTREMELY DANGEROUS. Intended solely for running in environments',
-      '                                                  that are externally sandboxed',
-      '  -C, --cd <DIR>                                  Tell the agent to use the specified directory as its working root',
-      '      --search                                    Enable web search (off by default). When enabled, the native Responses `web_search` tool is available to the model (no per‑call approval)',
-      '  -h, --help                                      Print help (see more with "--help")',
-      '  -V, --version                                   Print version'
-    ];
-  }
+  const getCurrentWord = useCallback(() => {
+    const beforeCursor = commandLine.substring(0, cursorPosition);
+    const words = beforeCursor.split(' ');
+    return words[words.length - 1] || '';
+  }, [commandLine, cursorPosition]);
 
   useEffect(() => {
     // Update suggestions based on current input
     const currentWord = getCurrentWord();
-    if (currentWord.startsWith('-')) {
-      const matching = options.filter(opt => 
-        opt.flags.some(flag => flag.toLowerCase().startsWith(currentWord.toLowerCase()))
-      );
-      setSuggestions(matching);
-      setSelectedSuggestion(0);
-    } else {
-      setSuggestions([]);
-    }
-  }, [commandLine, cursorPosition]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const getCurrentWord = () => {
-    const beforeCursor = commandLine.substring(0, cursorPosition);
-    const words = beforeCursor.split(' ');
-    return words[words.length - 1] || '';
-  };
+    startTransition(() => {
+      if (currentWord.startsWith('-')) {
+        const matching = options.filter(opt => 
+          opt.flags.some(flag => flag.toLowerCase().startsWith(currentWord.toLowerCase()))
+        );
+        setSuggestions(matching);
+        setSelectedSuggestion(0);
+      } else {
+        setSuggestions([]);
+        setSelectedSuggestion(0);
+      }
+    });
+  }, [commandLine, cursorPosition, getCurrentWord, options]);
 
   const insertSuggestion = (suggestion: ClaudeOption) => {
     // Guard against invalid suggestions
