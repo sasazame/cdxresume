@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-05-08
+
+### Changed
+- Release operations now publish via GitHub Actions and npm trusted publishing instead of local `npm publish`.
+- Dependabot policy now runs monthly, limits open PR volume, and holds major upgrades for `typescript`, `eslint`, `react`, and `ink` until explicitly reviewed.
+- CI and local support policy now target Node.js 22 and 24; Node.js 20 support has been removed.
+- Tooling and stable dependencies were refreshed across the current React 18 / Ink 5 support line.
+
 ## [0.1.4] - 2025-09-19
 
 ### Changed
