@@ -48,4 +48,5 @@ jobs:
         fi
 
     - name: Publish to npm
+      if: github.event_name == 'release'
       run: npm publish
