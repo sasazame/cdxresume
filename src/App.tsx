@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
 import { Box, Text, useInput, useApp, useStdout, useStdin } from 'ink';
 import { ConversationList } from './components/ConversationList.js';
 import { ConversationPreview } from './components/ConversationPreview.js';
@@ -63,7 +63,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
   const [error, setError] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: DEFAULT_TERMINAL_WIDTH, height: DEFAULT_TERMINAL_HEIGHT });
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [config, setConfig] = useState<Config | null>(null);
+  const config = useMemo<Config>(() => loadConfig(), []);
   const [showCommandEditor, setShowCommandEditor] = useState(false);
   const [editedArgs, setEditedArgs] = useState<string[]>(codexArgs);
   const [showFullView, setShowFullView] = useState(false);
@@ -80,16 +80,11 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
   const [paginating, setPaginating] = useState(false);
 
   useEffect(() => {
-    // Load config on mount
-    const loadedConfig = loadConfig();
-    setConfig(loadedConfig);
     // Detect Codex feature support once at startup
-    try { setCodexSupport(detectCodexSupport()); } catch { /* ignore */ }
+    startTransition(() => {
+      try { setCodexSupport(detectCodexSupport()); } catch { /* ignore */ }
+    });
   }, []);
-
-  useEffect(() => {
-    loadConversations();
-  }, [currentDirOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Update dimensions on terminal resize
@@ -204,7 +199,7 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
     }, EXECUTE_DELAY_MS);
   };
 
-  const loadConversations = async (isPaginating = false) => {
+  const loadConversations = useCallback(async (isPaginating = false) => {
     try {
       if (isPaginating) {
         setPaginating(true);
@@ -232,23 +227,20 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
       setLoading(false);
       setPaginating(false);
     }
-  };
+  }, [currentDirOnly, currentPage]);
 
-  // Track previous page for detecting page changes
-  const [prevPage, setPrevPage] = useState(0);
+  const prevPageRef = useRef(0);
   
-  // Reload conversations when page changes
   useEffect(() => {
-    const isPaginating = currentPage !== prevPage;
-    setPrevPage(currentPage);
-    loadConversations(isPaginating);
-  }, [currentPage, currentDirOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+    const wasPage = prevPageRef.current;
+    const isPaginating = currentPage !== wasPage;
+    prevPageRef.current = currentPage;
+    void loadConversations(isPaginating);
+  }, [currentPage, loadConversations]);
 
   useInput((input, key) => {
     // Don't process any input when command editor is shown
     if (showCommandEditor) return;
-    
-    if (!config) return;
     
     if (matchesKeyBinding(input, key, config.keybindings.quit)) {
       exit();
@@ -444,8 +436,8 @@ const App: React.FC<AppProps> = ({ codexArgs = [], currentDirOnly = false, hideO
         <Box>
           <Text dimColor>
             {(() => {
-              const prevKeys = config?.keybindings.pagePrevious.map(k => k === 'left' ? '←' : k).join('/') || '←';
-              const nextKeys = config?.keybindings.pageNext.map(k => k === 'right' ? '→' : k).join('/') || '→';
+              const prevKeys = config.keybindings.pagePrevious.map(k => k === 'left' ? '←' : k).join('/') || '←';
+              const nextKeys = config.keybindings.pageNext.map(k => k === 'right' ? '→' : k).join('/') || '→';
               const pageHelp = `Press ${prevKeys}/${nextKeys} for pages`;
               
               return totalCount === -1 ? (
