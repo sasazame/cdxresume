@@ -1,5 +1,10 @@
 # cdxresume
 
+> [!IMPORTANT]
+> **Maintenance has ended.** Published versions of `cdxresume` remain available on npm. This project will no longer receive fixes or compatibility updates.
+>
+> To browse and resume sessions using the built-in picker, run `codex resume`.
+
 A character user interface (CUI) tool for browsing and resuming OpenAI Codex CLI sessions.
 
 ![cdxresume screenshot](docs/images/demo-screenshot.png)
